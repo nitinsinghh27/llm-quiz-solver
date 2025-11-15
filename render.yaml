@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: llm-quiz-solver
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -r requirements.txt && playwright install chromium && playwright install-deps
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 180 --workers 1
+    envVars:
+      - key: SECRET
+        sync: false
+      - key: EMAIL
+        sync: false
+      - key: AIPIPE_API_KEY
+        sync: false
+      - key: AIPIPE_BASE_URL
+        value: https://api.aipipe.ai/v1
+      - key: PORT
+        value: 10000

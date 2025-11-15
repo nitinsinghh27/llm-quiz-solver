@@ -1,0 +1,52 @@
+#!/bin/bash
+
+echo "=========================================="
+echo "Render.com Deployment Setup Script"
+echo "=========================================="
+echo ""
+
+# Check if GitHub CLI is installed
+if ! command -v gh &> /dev/null; then
+    echo "GitHub CLI not found. Please install it:"
+    echo "  brew install gh"
+    echo ""
+    echo "Or create the repo manually at: https://github.com/new"
+    echo ""
+    read -p "Press Enter after creating the repo..."
+else
+    echo "Creating GitHub repository..."
+    gh repo create llm-quiz-solver --public --source=. --remote=origin --push
+fi
+
+echo ""
+echo "=========================================="
+echo "Next Steps:"
+echo "=========================================="
+echo ""
+echo "1. Go to: https://render.com"
+echo "2. Sign up with GitHub (if you haven't)"
+echo "3. Click 'New +' → 'Web Service'"
+echo "4. Connect your GitHub account"
+echo "5. Select 'llm-quiz-solver' repository"
+echo ""
+echo "6. Configure the service:"
+echo "   Name: llm-quiz-solver"
+echo "   Environment: Python 3"
+echo "   Build Command:"
+echo "     pip install -r requirements.txt && playwright install chromium && playwright install-deps"
+echo "   Start Command:"
+echo "     gunicorn app:app --bind 0.0.0.0:\$PORT --timeout 180 --workers 1"
+echo "   Instance Type: Free"
+echo ""
+echo "7. Add Environment Variables:"
+echo "   SECRET = dracarys"
+echo "   EMAIL = 23f3004206@ds.study.iitm.ac.in"
+echo "   AIPIPE_API_KEY = eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6IjIzZjMwMDQyMDZAZHMuc3R1ZHkuaWl0bS5hYy5pbiJ9.QU4eoSXkpg1Mt9wr5IEjpkzGQZDe-UzSQ-8sI9eKAFg"
+echo "   AIPIPE_BASE_URL = https://api.aipipe.ai/v1"
+echo ""
+echo "8. Click 'Create Web Service'"
+echo ""
+echo "Wait 5-10 minutes for deployment to complete."
+echo "You'll get a URL like: https://llm-quiz-solver.onrender.com"
+echo ""
+echo "=========================================="
