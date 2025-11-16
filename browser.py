@@ -1,74 +1,79 @@
-from playwright.sync_api import sync_playwright
+import requests
 import logging
-import time
+import base64
+import re
 
 logger = logging.getLogger(__name__)
 
 class BrowserHandler:
-    """Handles headless browser operations for rendering JavaScript-based quiz pages"""
+    """Handles HTTP requests to fetch and render quiz pages (without actual browser)"""
 
     def __init__(self):
-        self.playwright = None
-        self.browser = None
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
 
     def __enter__(self):
         """Context manager entry"""
-        self.playwright = sync_playwright().start()
-        self.browser = self.playwright.chromium.launch(headless=True)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit"""
-        if self.browser:
-            self.browser.close()
-        if self.playwright:
-            self.playwright.stop()
+        if self.session:
+            self.session.close()
 
     def get_rendered_content(self, url, wait_time=3):
         """
-        Visit a URL with a headless browser and return the rendered HTML content
+        Fetch URL content and decode any base64 encoded content
 
         Args:
             url: The URL to visit
-            wait_time: Time to wait for JavaScript execution (seconds)
+            wait_time: Ignored (kept for compatibility)
 
         Returns:
-            str: The rendered HTML content
+            str: The HTML content with decoded base64
         """
         try:
-            logger.info(f"Opening browser for URL: {url}")
-            page = self.browser.new_page()
+            logger.info(f"Fetching URL: {url}")
+            response = self.session.get(url, timeout=30)
+            response.raise_for_status()
 
-            # Set a reasonable timeout
-            page.set_default_timeout(30000)  # 30 seconds
+            html_content = response.text
+            logger.info(f"Fetched page, content length: {len(html_content)}")
 
-            # Navigate to the URL
-            page.goto(url, wait_until='networkidle')
+            # Decode base64 content if present (common in quiz pages)
+            # Look for atob() patterns and decode them
+            decoded_content = self._decode_base64_in_html(html_content)
 
-            # Wait for JavaScript to execute
-            time.sleep(wait_time)
-
-            # Get the rendered content
-            content = page.content()
-
-            # Also get the text content of specific elements if they exist
-            try:
-                # Try to get content from common result divs
-                result_div = page.query_selector('#result')
-                if result_div:
-                    text_content = result_div.inner_text()
-                    logger.info(f"Found #result div with content: {text_content[:200]}...")
-            except Exception as e:
-                logger.debug(f"Could not extract #result div: {e}")
-
-            page.close()
-            logger.info(f"Successfully rendered page, content length: {len(content)}")
-
-            return content
+            return decoded_content
 
         except Exception as e:
-            logger.error(f"Error rendering page {url}: {e}", exc_info=True)
+            logger.error(f"Error fetching page {url}: {e}", exc_info=True)
             raise
+
+    def _decode_base64_in_html(self, html):
+        """Decode base64 content embedded in HTML/JavaScript"""
+        try:
+            # Find atob() calls with base64 content
+            pattern = r'atob\([`"\']([A-Za-z0-9+/=]+)[`"\']\)'
+            matches = re.findall(pattern, html)
+
+            result_html = html
+            for base64_str in matches:
+                try:
+                    decoded = base64.b64decode(base64_str).decode('utf-8', errors='ignore')
+                    logger.info(f"Decoded base64 content: {decoded[:200]}...")
+                    # Add decoded content to HTML
+                    result_html += f"\n<!-- Decoded Content -->\n{decoded}\n"
+                except Exception as e:
+                    logger.debug(f"Could not decode base64: {e}")
+
+            return result_html
+
+        except Exception as e:
+            logger.error(f"Error decoding base64: {e}")
+            return html
 
     def download_file(self, url, save_path):
         """
@@ -83,18 +88,14 @@ class BrowserHandler:
         """
         try:
             logger.info(f"Downloading file from: {url}")
-            page = self.browser.new_page()
+            response = self.session.get(url, timeout=60, stream=True)
+            response.raise_for_status()
 
-            # Start waiting for download
-            with page.expect_download() as download_info:
-                page.goto(url)
+            with open(save_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
 
-            download = download_info.value
-            download.save_as(save_path)
-
-            page.close()
             logger.info(f"File downloaded successfully to: {save_path}")
-
             return save_path
 
         except Exception as e:
