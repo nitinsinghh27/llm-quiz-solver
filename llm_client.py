@@ -8,12 +8,12 @@ class LLMClient:
     """Handles interaction with LLM API (AIPIPE or OpenAI) for solving quiz questions"""
 
     def __init__(self):
-        # Initialize OpenAI client with AIPIPE endpoint
+        # Initialize OpenAI client with Gemini endpoint
         self.client = OpenAI(
             api_key=Config.AIPIPE_API_KEY,
             base_url=Config.AIPIPE_BASE_URL
         )
-        self.model = "gpt-4o"  # Using GPT-4o for better reasoning
+        self.model = "gemini-2.5-flash-preview-05-20"  # Using Gemini 2.5 Flash
 
     def solve_question(self, question_text, context=None):
         """
