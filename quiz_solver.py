@@ -109,7 +109,7 @@ class QuizSolver:
         logger.info(f"Extracted question text:\n{question_text}")
 
         # Step 3: Extract submit URL and any file URLs from the question
-        submit_url = self.extract_submit_url(question_text, html_content)
+        submit_url = self.extract_submit_url(question_text, html_content, quiz_url)
         logger.info(f"Submit URL: {submit_url}")
 
         # Step 4: Check if there are any files to download
@@ -133,9 +133,11 @@ class QuizSolver:
 
         return result
 
-    def extract_submit_url(self, text, html):
+    def extract_submit_url(self, text, html, base_url):
         """Extract the submit URL from the question text or HTML"""
-        # Look for URLs in the text that contain 'submit' or are the posting endpoint
+        from urllib.parse import urljoin
+
+        # Look for absolute URLs first
         patterns = [
             r'Post your answer to (https?://[^\s]+)',
             r'submit[^\s]* (https?://[^\s]+)',
@@ -148,7 +150,22 @@ class QuizSolver:
                 url = match.group(1).rstrip('.,;:')
                 return url
 
-        # Fallback: look for any URL that looks like a submit endpoint
+        # Look for relative URLs (e.g., "POST to /submit")
+        relative_patterns = [
+            r'POST[^\n]*to\s+(/[^\s]+)',
+            r'Post[^\n]*to\s+(/[^\s]+)',
+            r'submit[^\n]*to\s+(/[^\s]+)',
+        ]
+
+        for pattern in relative_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                relative_url = match.group(1).rstrip('.,;:')
+                absolute_url = urljoin(base_url, relative_url)
+                logger.info(f"Found relative URL '{relative_url}', converted to: {absolute_url}")
+                return absolute_url
+
+        # Fallback: look for any absolute URL that looks like a submit endpoint
         urls = re.findall(r'https?://[^\s<>"{}|\\^`\[\]]+', text)
         for url in urls:
             if 'submit' in url.lower():
