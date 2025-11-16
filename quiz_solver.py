@@ -33,7 +33,7 @@ class QuizSolver:
         self.start_time = time.time()
         current_url = initial_url
         attempt = 0
-        max_attempts = 20  # Prevent infinite loops
+        max_attempts = 5  # Limit to 5 attempts to avoid rate limiting
 
         logger.info(f"Starting quiz chain from: {initial_url}")
 
