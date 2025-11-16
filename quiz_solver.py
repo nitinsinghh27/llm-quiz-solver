@@ -99,12 +99,21 @@ class QuizSolver:
         # Step 2: Parse the HTML to extract the question
         soup = BeautifulSoup(html_content, 'html.parser')
 
-        # Extract text content from the result div or body
-        result_div = soup.find('div', {'id': 'result'})
+        # Extract text content from the result/question div or body
+        # Try multiple common div IDs used in quiz pages
+        result_div = soup.find('div', {'id': 'result'}) or soup.find('div', {'id': 'question'})
         if result_div:
             question_text = result_div.get_text(strip=False)
         else:
             question_text = soup.get_text(strip=False)
+
+        # If still empty, try to get from decoded content comments
+        if not question_text.strip():
+            # Look for decoded content in HTML comments
+            import re
+            decoded_match = re.search(r'<!-- Decoded Content -->\s*(.+?)(?=\n<!--|\Z)', html_content, re.DOTALL)
+            if decoded_match:
+                question_text = decoded_match.group(1).strip()
 
         logger.info(f"Extracted question text:\n{question_text}")
 
