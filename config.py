@@ -7,7 +7,7 @@ class Config:
     SECRET = os.getenv('SECRET')
     EMAIL = os.getenv('EMAIL')
     AIPIPE_API_KEY = os.getenv('AIPIPE_API_KEY')
-    AIPIPE_BASE_URL = os.getenv('AIPIPE_BASE_URL', 'https://llmfoundry.straive.com/openai/v1')
+    AIPIPE_BASE_URL = os.getenv('AIPIPE_BASE_URL', 'https://aipipe.org/openai/v1')
     PORT = int(os.getenv('PORT', 5000))
 
     @classmethod
