@@ -246,20 +246,19 @@ class QuizSolver:
                     canvas_lines = re.findall(r'"([^"]*)"', lines_content)
                     canvas_text = "\n".join(canvas_lines)
 
-                context = f"""Canvas-rendered puzzle.
+                # Since we already computed the answer, just provide minimal context
+                context = f"""Alphametic puzzle requiring an 8-digit key.
 
-Puzzle Text (rendered on canvas):
-{canvas_text}
+The puzzle text says:
+{canvas_text[:500]}
 
-JavaScript code:
-{all_scripts}
+The key is computed as: ((emailNumber * 7919 + 12345) mod 100000000)
+For email: {email}
+emailNumber (first 4 hex of SHA1): {email_number}
 
-Your email: {email}
-Computed emailNumber: {email_number}
-Computed key: {key_str}
+Computed answer: {key_str}
 
-TASK: The puzzle asks you to submit the key. The key is: {key_str}"""
-                logger.info(f"Extracted {len(all_scripts)} chars of JavaScript")
+Return this 8-digit number as the answer."""
                 logger.info(f"Pre-computed key for {email}: {key_str}")
 
                 # Also update question_text to include canvas text for submit URL extraction
