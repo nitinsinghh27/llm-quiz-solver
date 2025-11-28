@@ -22,9 +22,21 @@ class LLMClient:
             api_key=current_config['api_key'],
             base_url=current_config['base_url']
         )
-        self.model = "gemini-2.5-flash"  # Using Gemini 2.5 Flash (stable)
+
+        # Set model based on the base_url (different providers use different model names)
+        self.model = self._get_model_for_provider(current_config['base_url'])
+
         logger.info(f"Initialized LLM client with {len(self.api_configs)} API config(s)")
-        logger.info(f"Using {current_config['name']} API: {current_config['base_url']}")
+        logger.info(f"Using {current_config['name']} API: {current_config['base_url']}, Model: {self.model}")
+
+    def _get_model_for_provider(self, base_url):
+        """Determine the correct model name based on the API provider"""
+        if 'aipipe.org' in base_url or 'openrouter' in base_url:
+            # AIPIPE/OpenRouter uses google/gemini-2.0-flash-exp:free
+            return "google/gemini-2.0-flash-exp:free"
+        else:
+            # Direct Gemini API uses gemini-2.5-flash
+            return "gemini-2.5-flash"
 
     def _rotate_api_config(self):
         """Rotate to the next API configuration"""
@@ -40,10 +52,14 @@ class LLMClient:
             api_key=new_config['api_key'],
             base_url=new_config['base_url']
         )
+
+        # Update model based on new provider
+        self.model = self._get_model_for_provider(new_config['base_url'])
+
         # Also update genai for multimodal
         genai.configure(api_key=new_config['api_key'])
 
-        logger.info(f"Rotated to {new_config['name']} API: {new_config['base_url']}")
+        logger.info(f"Rotated to {new_config['name']} API: {new_config['base_url']}, Model: {self.model}")
         return True
 
     def _call_with_retry(self, api_call_func, max_retries=2):
