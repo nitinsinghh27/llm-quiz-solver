@@ -12,45 +12,47 @@ class LLMClient:
     """Handles interaction with LLM API (AIPIPE or OpenAI) for solving quiz questions"""
 
     def __init__(self):
-        # Get all available API keys
-        self.api_keys = Config.get_api_keys()
-        self.current_key_index = 0
+        # Get all available API configurations
+        self.api_configs = Config.get_api_configs()
+        self.current_config_index = 0
 
-        # Initialize OpenAI client with first API key
+        # Initialize OpenAI client with first configuration
+        current_config = self.api_configs[0]
         self.client = OpenAI(
-            api_key=self.api_keys[0],
-            base_url=Config.AIPIPE_BASE_URL
+            api_key=current_config['api_key'],
+            base_url=current_config['base_url']
         )
         self.model = "gemini-2.5-flash"  # Using Gemini 2.5 Flash (stable)
-        logger.info(f"Initialized LLM client with {len(self.api_keys)} API key(s)")
+        logger.info(f"Initialized LLM client with {len(self.api_configs)} API config(s)")
+        logger.info(f"Using {current_config['name']} API: {current_config['base_url']}")
 
-    def _rotate_api_key(self):
-        """Rotate to the next API key"""
-        if len(self.api_keys) <= 1:
-            logger.warning("Only one API key available, cannot rotate")
+    def _rotate_api_config(self):
+        """Rotate to the next API configuration"""
+        if len(self.api_configs) <= 1:
+            logger.warning("Only one API config available, cannot rotate")
             return False
 
-        self.current_key_index = (self.current_key_index + 1) % len(self.api_keys)
-        new_key = self.api_keys[self.current_key_index]
+        self.current_config_index = (self.current_config_index + 1) % len(self.api_configs)
+        new_config = self.api_configs[self.current_config_index]
 
-        # Reinitialize client with new key
+        # Reinitialize client with new configuration
         self.client = OpenAI(
-            api_key=new_key,
-            base_url=Config.AIPIPE_BASE_URL
+            api_key=new_config['api_key'],
+            base_url=new_config['base_url']
         )
         # Also update genai for multimodal
-        genai.configure(api_key=new_key)
+        genai.configure(api_key=new_config['api_key'])
 
-        logger.info(f"Rotated to API key #{self.current_key_index + 1}")
+        logger.info(f"Rotated to {new_config['name']} API: {new_config['base_url']}")
         return True
 
     def _call_with_retry(self, api_call_func, max_retries=2):
         """
-        Execute API call with automatic retry and key rotation on rate limit
+        Execute API call with automatic retry and API provider rotation on rate limit
 
         Args:
             api_call_func: Function that makes the API call
-            max_retries: Maximum number of retries (including key rotations)
+            max_retries: Maximum number of retries (including provider rotations)
 
         Returns:
             API response
@@ -63,12 +65,12 @@ class LLMClient:
             except RateLimitError as e:
                 logger.warning(f"Rate limit hit (attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
-                    # Try rotating API key
-                    if self._rotate_api_key():
-                        logger.info("Retrying with new API key...")
+                    # Try rotating API configuration
+                    if self._rotate_api_config():
+                        logger.info("Retrying with different API provider...")
                         continue
                     else:
-                        logger.error("Cannot rotate API key, re-raising error")
+                        logger.error("Cannot rotate API config, re-raising error")
                         raise
                 else:
                     logger.error("Max retries reached, re-raising error")
