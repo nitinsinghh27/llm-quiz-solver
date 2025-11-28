@@ -7,6 +7,7 @@ import hashlib
 from bs4 import BeautifulSoup
 from browser import BrowserHandler
 from llm_client import LLMClient
+from audio_transcriber import AudioTranscriber
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -21,6 +22,7 @@ class QuizSolver:
 
     def __init__(self):
         self.llm = LLMClient()
+        self.transcriber = AudioTranscriber()
         self.start_time = None
         self.max_time = 180  # 3 minutes in seconds
 
@@ -118,14 +120,17 @@ class QuizSolver:
                     logger.warning(f"Could not parse cutoff value: {e}")
             else:
                 # Cutoff span is empty - it's populated by JavaScript emailNumber()
-                # Compute it ourselves using the email from the URL
+                # Compute it ourselves using the email from the URL or the provided email parameter
                 from urllib.parse import urlparse, parse_qs
                 parsed = urlparse(quiz_url)
                 query_params = parse_qs(parsed.query)
-                email = query_params.get('email', [None])[0]
-                if email:
-                    cutoff_value = compute_email_number(email)
-                    logger.info(f"Computed cutoff from email {email}: {cutoff_value}")
+                email_from_url = query_params.get('email', [None])[0]
+
+                # Use email from URL if available, otherwise use the email parameter
+                email_to_use = email_from_url or email
+                if email_to_use:
+                    cutoff_value = compute_email_number(email_to_use)
+                    logger.info(f"Computed cutoff from email {email_to_use}: {cutoff_value}")
 
         # Extract text content from the result/question div or body
         # Try multiple common div IDs used in quiz pages
@@ -159,81 +164,83 @@ class QuizSolver:
             context = processed['text']
             media_files = processed['media_files']
 
-        # Step 5: Use LLM to solve the question OR process locally if cutoff is provided
-        # If cutoff value was found in HTML and we have CSV data, process locally
-        if cutoff_value is not None and context and 'CSV Data' in context:
-            logger.info(f"Processing CSV locally with cutoff value: {cutoff_value}")
-            try:
-                # Parse the CSV from context
-                import pandas as pd
-                from io import StringIO
-                # Extract CSV data from context
-                csv_match = re.search(r'CSV Data:\n(.+?)(?=\n\n|$)', context, re.DOTALL)
-                if csv_match:
-                    csv_text = csv_match.group(1)
-                    df = pd.read_csv(StringIO(csv_text), sep=r'\s+')  # Assuming space-separated
-                    # Sum values >= cutoff (greater than or equal to)
-                    filtered_values = df[df.iloc[:, 0] >= cutoff_value].iloc[:, 0]
-                    result = int(filtered_values.sum())
-                    formatted_answer = result
-                    logger.info(f"CSV processing result: sum of {len(filtered_values)} values >= {cutoff_value} = {formatted_answer}")
-                else:
-                    logger.error("Could not extract CSV data from context")
-                    formatted_answer = 0
-            except Exception as e:
-                logger.error(f"Error processing CSV with cutoff: {e}", exc_info=True)
-                formatted_answer = 0
+        # Step 5: Use LLM to solve the question
+        # Priority: If media files exist, use two-stage audio processing (transcript + code generation)
+        if media_files:
+            # Stage 1: Transcribe audio locally (no need to send to Gemini)
+            logger.info("Stage 1: Transcribing audio file locally")
+            audio_transcript = ""
 
-            # Clean up media files if any were downloaded
             for media_file in media_files:
                 try:
-                    if os.path.exists(media_file['path']):
-                        os.remove(media_file['path'])
-                        logger.info(f"Cleaned up media file: {media_file['path']}")
-                except Exception as e:
-                    logger.warning(f"Error cleaning up {media_file['path']}: {e}")
-
-        elif media_files:
-            # If we have media files but no cutoff in HTML, try to extract from audio
-            logger.info("Processing audio file to extract code/cutoff value")
-            # Get the code from audio
-            audio_code = self.llm.solve_question(question_text, None, media_files)  # No CSV context
-            logger.info(f"Extracted code from audio: {audio_code}")
-
-            # Clean up media files after extraction
-            for media_file in media_files:
-                try:
-                    if os.path.exists(media_file['path']):
-                        os.remove(media_file['path'])
-                        logger.info(f"Cleaned up media file: {media_file['path']}")
-                except Exception as e:
-                    logger.warning(f"Error cleaning up {media_file['path']}: {e}")
-
-            # Now process the CSV with the extracted code
-            if context and 'CSV Data' in context:
-                logger.info(f"Processing CSV with cutoff value: {audio_code}")
-                try:
-                    cutoff = int(audio_code.strip())
-                    # Parse the CSV from context
-                    import pandas as pd
-                    from io import StringIO
-                    # Extract CSV data from context
-                    csv_match = re.search(r'CSV Data:\n(.+?)(?=\n\n|$)', context, re.DOTALL)
-                    if csv_match:
-                        csv_text = csv_match.group(1)
-                        df = pd.read_csv(StringIO(csv_text), sep=r'\s+')  # Assuming space-separated
-                        # Sum values >= cutoff (greater than or equal to)
-                        filtered_values = df[df.iloc[:, 0] >= cutoff].iloc[:, 0]
-                        result = int(filtered_values.sum())
-                        formatted_answer = result
-                        logger.info(f"CSV processing result: sum of {len(filtered_values)} values >= {cutoff} = {formatted_answer}")
+                    transcript = self.transcriber.transcribe_audio(media_file['path'])
+                    if transcript:
+                        audio_transcript = transcript
+                        logger.info(f"Audio transcript: {audio_transcript}")
                     else:
-                        formatted_answer = audio_code
+                        logger.warning(f"Failed to transcribe {media_file['path']}")
                 except Exception as e:
-                    logger.error(f"Error processing CSV with audio code: {e}")
-                    formatted_answer = audio_code
+                    logger.error(f"Error transcribing {media_file['path']}: {e}", exc_info=True)
+
+            # Clean up media files after transcription
+            for media_file in media_files:
+                try:
+                    if os.path.exists(media_file['path']):
+                        os.remove(media_file['path'])
+                        logger.info(f"Cleaned up media file: {media_file['path']}")
+                except Exception as e:
+                    logger.warning(f"Error cleaning up {media_file['path']}: {e}")
+
+            # Stage 2: Use audio transcript to generate and execute code
+            if context and 'CSV Data' in context:
+                logger.info("Stage 2: Generating Python code from audio transcript")
+                logger.info("="*80)
+                logger.info(f"FULL AUDIO TRANSCRIPT:\n{audio_transcript}")
+                logger.info("="*80)
+
+                # Extract CSV filename from media_files context
+                csv_filename = "temp_file.csv"  # We know we downloaded it as temp_file.csv
+
+                # Generate Python code from LLM
+                generated_code = self.llm.solve_with_audio_instructions(
+                    question_text, audio_transcript, csv_filename, cutoff_value
+                )
+
+                if generated_code:
+                    logger.info("Executing generated Python code...")
+                    try:
+                        # Execute the generated code in a safe namespace
+                        namespace = {'__builtins__': __builtins__}
+                        exec(generated_code, namespace)
+
+                        # Extract the result
+                        if 'result' in namespace:
+                            formatted_answer = namespace['result']
+                            # Convert numpy types to Python native types for JSON serialization
+                            if hasattr(formatted_answer, 'item'):
+                                formatted_answer = formatted_answer.item()
+                            logger.info(f"Code execution result: {formatted_answer}")
+                        else:
+                            logger.error("Generated code did not produce 'result' variable")
+                            formatted_answer = 0
+                    except Exception as e:
+                        logger.error(f"Error executing generated code: {e}", exc_info=True)
+                        logger.error(f"Failed code:\n{generated_code}")
+                        formatted_answer = 0
+
+                    # Clean up CSV file after code execution
+                    try:
+                        if os.path.exists(csv_filename):
+                            os.remove(csv_filename)
+                            logger.info(f"Cleaned up CSV file: {csv_filename}")
+                    except Exception as e:
+                        logger.warning(f"Error cleaning up CSV file: {e}")
+                else:
+                    logger.error("LLM did not generate code")
+                    formatted_answer = 0
             else:
-                formatted_answer = audio_code
+                # No CSV data, just use the transcript as the answer
+                formatted_answer = audio_transcript
         else:
             # Text-only quiz - use LLM normally
             raw_answer = self.llm.solve_question(question_text, context, media_files)
@@ -441,9 +448,11 @@ class QuizSolver:
                         # Don't delete yet - LLM needs to access it
                         continue
 
-                    # Clean up text-based files (but not media files)
+                    # Clean up text-based files (but not media files or CSV files when media exists)
+                    # If we have media files, keep CSV for later code execution
                     if os.path.exists(filename) and ext not in ['mp3', 'wav', 'opus', 'ogg', 'm4a', 'mp4', 'webm']:
-                        os.remove(filename)
+                        # Don't clean up yet - will be cleaned up after code execution
+                        pass
 
                 except Exception as e:
                     logger.error(f"Error processing file {url}: {e}")

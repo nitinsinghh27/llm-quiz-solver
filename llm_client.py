@@ -38,9 +38,9 @@ class LLMClient:
 
             # Build the prompt - simplified for media files to avoid token limits
             if media_files and len(media_files) > 0:
-                # Ultra-simplified prompt for audio - no context/CSV data to reduce tokens
-                system_prompt = """What number or code is spoken in the audio? Return only that value."""
-                user_prompt = "Listen to the audio and tell me the number or code mentioned."
+                # Request full transcript for audio files
+                system_prompt = """Transcribe this audio file completely and accurately. Provide the full transcript of everything spoken."""
+                user_prompt = "Please provide a complete transcript of the audio."
             else:
                 system_prompt = """You are a data analysis expert helping to solve quiz questions.
 The questions involve data sourcing, preparation, analysis, and visualization.
@@ -91,7 +91,7 @@ Do not include explanations unless specifically asked. Just provide the answer."
                     prompt_parts,
                     generation_config=genai.types.GenerationConfig(
                         temperature=0.1,
-                        max_output_tokens=100,  # Reduced - we only need the answer, not full transcription
+                        max_output_tokens=2000,  # Increased to handle full transcripts
                     ),
                     safety_settings={
                         genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
@@ -157,6 +157,86 @@ Do not include explanations unless specifically asked. Just provide the answer."
 
         except Exception as e:
             logger.error(f"Error calling LLM API: {e}", exc_info=True)
+            raise
+
+    def solve_with_audio_instructions(self, question_text, audio_transcript, csv_filename=None, cutoff_value=None):
+        """
+        Use audio transcript to generate Python code that solves the problem
+
+        Args:
+            question_text: The question text from the quiz page
+            audio_transcript: The full transcript from audio file
+            csv_filename: Name of the CSV file to process
+            cutoff_value: The cutoff value (if applicable)
+
+        Returns:
+            str: Python code to execute that will solve the problem
+        """
+        try:
+            logger.info(f"Generating code from audio instructions: {audio_transcript[:200]}...")
+
+            system_prompt = """You are a Python code generator for data analysis tasks. You will receive:
+1. Audio transcript with instructions on what to do with data
+2. Question text
+3. CSV filename (if applicable)
+4. Cutoff value (if applicable)
+
+Generate ONLY executable Python code that:
+- Reads the CSV file using pandas with header=None (CSV has NO header row)
+- Follows the instructions from the audio transcript
+- Stores the final answer in a variable called 'result'
+- Does NOT print anything
+
+Return ONLY the Python code, no explanations, no markdown formatting, no ```python blocks."""
+
+            user_prompt = f"""Audio Instructions:
+{audio_transcript}
+
+Question:
+{question_text}"""
+
+            if csv_filename:
+                user_prompt += f"\n\nCSV File: {csv_filename}"
+
+            if cutoff_value is not None:
+                user_prompt += f"\nCutoff Value: {cutoff_value}"
+
+            user_prompt += "\n\nGenerate Python code that solves this problem. The code should read the CSV file and store the final answer in a variable called 'result'."
+
+            # Use OpenAI-compatible API for text-only queries
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.1,
+                max_tokens=2000
+            )
+
+            content = response.choices[0].message.content
+            if content is None:
+                logger.warning("LLM returned None content (possibly safety filter)")
+                if hasattr(response.choices[0].message, 'refusal') and response.choices[0].message.refusal:
+                    logger.warning(f"Refusal reason: {response.choices[0].message.refusal}")
+                return ""
+
+            code = content.strip()
+            # Remove markdown code blocks if present
+            if code.startswith('```python'):
+                code = code[len('```python'):].strip()
+            if code.startswith('```'):
+                code = code[3:].strip()
+            if code.endswith('```'):
+                code = code[:-3].strip()
+
+            logger.info(f"Generated code:\n{code}")
+            return code
+
+        except Exception as e:
+            logger.error(f"Error generating code from audio instructions: {e}", exc_info=True)
             raise
 
     def extract_answer_format(self, question_text, raw_answer):
