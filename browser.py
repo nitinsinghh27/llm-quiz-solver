@@ -44,7 +44,8 @@ class BrowserHandler:
 
             # Decode base64 content if present (common in quiz pages)
             # Look for atob() patterns and decode them
-            decoded_content = self._decode_base64_in_html(html_content)
+            # Pass URL to handle $EMAIL replacements
+            decoded_content = self._decode_base64_in_html(html_content, url)
 
             return decoded_content
 
@@ -52,17 +53,41 @@ class BrowserHandler:
             logger.error(f"Error fetching page {url}: {e}", exc_info=True)
             raise
 
-    def _decode_base64_in_html(self, html):
+    def _decode_base64_in_html(self, html, url=None):
         """Decode base64 content embedded in HTML/JavaScript"""
         try:
-            # Find atob() calls with base64 content
-            pattern = r'atob\([`"\']([A-Za-z0-9+/=]+)[`"\']\)'
-            matches = re.findall(pattern, html)
+            from urllib.parse import urlparse, parse_qs
+
+            # Extract email from URL query params if available
+            email = None
+            if url:
+                parsed = urlparse(url)
+                query_params = parse_qs(parsed.query)
+                email = query_params.get('email', [None])[0]
+                if email:
+                    logger.info(f"Extracted email from URL: {email}")
+
+            # Pattern 1: Direct atob() calls with inline strings
+            pattern1 = r'atob\([`"\']([A-Za-z0-9+/=]+)[`"\']\)'
+            matches1 = re.findall(pattern1, html)
+
+            # Pattern 2: Variable assignments with base64 strings (e.g., const code = `base64...`)
+            pattern2 = r'(?:const|let|var)\s+\w+\s*=\s*[`"\']([A-Za-z0-9+/=]{50,})[`"\']'
+            matches2 = re.findall(pattern2, html)
+
+            # Combine all matches
+            all_matches = matches1 + matches2
 
             result_html = html
-            for base64_str in matches:
+            for base64_str in all_matches:
                 try:
                     decoded = base64.b64decode(base64_str).decode('utf-8', errors='ignore')
+
+                    # Replace $EMAIL placeholder with actual email if present
+                    if email and '$EMAIL' in decoded:
+                        logger.info(f"Replacing $EMAIL placeholder with: {email}")
+                        decoded = decoded.replace('$EMAIL', email)
+
                     logger.info(f"Decoded base64 content: {decoded[:200]}...")
                     # Add decoded content to HTML
                     result_html += f"\n<!-- Decoded Content -->\n{decoded}\n"
