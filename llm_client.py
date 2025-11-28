@@ -155,6 +155,14 @@ For semantic search/embedding questions:
 - Calculate cosine similarity: dot(a,b) / (norm(a) * norm(b))
 - Return the document ID with highest similarity score
 
+For steganography/LSB extraction questions:
+- Download the image using requests with email and secret as query parameters
+- Use PIL (Pillow) to open the image
+- Extract LSB (Least Significant Bit) from RGB channels: pixel & 1
+- Collect bits and convert to bytes (8 bits = 1 byte)
+- Stop at null terminator (byte value 0) or when extracting ASCII printable characters
+- Decode bytes to string (UTF-8 or ASCII)
+
 Instructions:
 1. Read the question and context carefully (including any JavaScript code)
 2. If the question requires calling an API or performing computation, generate Python code
@@ -167,10 +175,11 @@ Instructions:
 9. Otherwise, return ONLY the final answer in the format requested
 
 Code generation rules:
-- If question mentions "call the API", "API endpoint", "fetch", "embedding", or "merge conflict", generate Python code
+- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", or "download", generate Python code
 - Use requests.get() or requests.post() as appropriate
-- Include email and secret parameters for authentication
+- Include email and secret parameters for authentication (as query params: ?email=...&secret=...)
 - For merge conflict detection: compare base vs theirs, base vs ours, and find keys with different modifications
+- For steganography: download image, extract LSB from pixels, convert bits to bytes, decode to string
 - ALWAYS add error handling: check response.status_code and handle JSON decode errors
 - If an API fails, try alternate approaches or check response.text for debugging
 - Store final answer in 'result' variable
