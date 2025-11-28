@@ -15,19 +15,22 @@ class LLMClient:
         )
         self.model = "gemini-2.5-flash"  # Using Gemini 2.5 Flash (stable)
 
-    def solve_question(self, question_text, context=None):
+    def solve_question(self, question_text, context=None, media_files=None):
         """
         Use LLM to solve a quiz question
 
         Args:
             question_text: The question text from the quiz page
             context: Optional additional context (e.g., data file contents)
+            media_files: Optional list of media file dicts with 'path', 'type', 'url'
 
         Returns:
             str: The LLM's answer
         """
         try:
             logger.info(f"Sending question to LLM: {question_text[:200]}...")
+            if media_files:
+                logger.info(f"Including {len(media_files)} media file(s)")
 
             # Build the prompt
             system_prompt = """You are a data analysis expert helping to solve quiz questions.
@@ -36,12 +39,13 @@ The questions involve data sourcing, preparation, analysis, and visualization.
 Instructions:
 1. Read the question carefully
 2. If data or files are mentioned, they will be provided in the context
-3. Perform the required analysis
-4. Return ONLY the final answer in the format requested
-5. For numerical answers, return just the number
-6. For text answers, return just the text
-7. For boolean answers, return true or false
-8. Be precise and accurate
+3. If audio/video files are provided, listen/watch them carefully to extract information
+4. Perform the required analysis
+5. Return ONLY the final answer in the format requested
+6. For numerical answers, return just the number
+7. For text answers, return just the text
+8. For boolean answers, return true or false
+9. Be precise and accurate
 
 Do not include explanations unless specifically asked. Just provide the answer."""
 
@@ -50,10 +54,54 @@ Do not include explanations unless specifically asked. Just provide the answer."
             if context:
                 user_prompt += f"\n\nContext/Data:\n{context}"
 
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ]
+            # Build messages array
+            if media_files and len(media_files) > 0:
+                # For multimodal content, use content array format
+                import base64
+
+                content_parts = [{"type": "text", "text": user_prompt}]
+
+                # Add media files as data URIs
+                for media_file in media_files:
+                    try:
+                        with open(media_file['path'], 'rb') as f:
+                            file_data = base64.b64encode(f.read()).decode('utf-8')
+
+                        # Determine MIME type
+                        mime_types = {
+                            'opus': 'audio/ogg',  # Opus is typically in ogg container
+                            'mp3': 'audio/mpeg',
+                            'wav': 'audio/wav',
+                            'ogg': 'audio/ogg',
+                            'm4a': 'audio/mp4',
+                            'mp4': 'video/mp4',
+                            'webm': 'video/webm'
+                        }
+                        ext = media_file['path'].split('.')[-1].lower()
+                        mime_type = mime_types.get(ext, 'application/octet-stream')
+
+                        # Add as input_audio for OpenAI-compatible format
+                        # Note: Gemini's OpenAI API supports audio via input_audio
+                        content_parts.append({
+                            "type": "input_audio",
+                            "input_audio": {
+                                "data": file_data,
+                                "format": ext
+                            }
+                        })
+                        logger.info(f"Added {media_file['type']} file: {media_file['path']} ({mime_type})")
+                    except Exception as e:
+                        logger.error(f"Error encoding media file {media_file['path']}: {e}")
+
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": content_parts}
+                ]
+            else:
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ]
 
             response = self.client.chat.completions.create(
                 model=self.model,

@@ -130,13 +130,25 @@ class QuizSolver:
         # Step 4: Check if there are any files to download
         file_urls = self.extract_file_urls(html_content)
         context = None
+        media_files = []
 
         if file_urls:
             logger.info(f"Found {len(file_urls)} file(s) to process")
-            context = self.process_files(file_urls, quiz_url)
+            processed = self.process_files(file_urls, quiz_url)
+            context = processed['text']
+            media_files = processed['media_files']
 
         # Step 5: Use LLM to solve the question
-        raw_answer = self.llm.solve_question(question_text, context)
+        raw_answer = self.llm.solve_question(question_text, context, media_files)
+
+        # Clean up media files after LLM processing
+        for media_file in media_files:
+            try:
+                if os.path.exists(media_file['path']):
+                    os.remove(media_file['path'])
+                    logger.info(f"Cleaned up media file: {media_file['path']}")
+            except Exception as e:
+                logger.warning(f"Error cleaning up {media_file['path']}: {e}")
 
         # Step 6: Format the answer appropriately
         formatted_answer = self.llm.extract_answer_format(question_text, raw_answer)
@@ -199,23 +211,28 @@ class QuizSolver:
         return None
 
     def extract_file_urls(self, html):
-        """Extract file URLs (PDF, CSV, etc.) and data source URLs from HTML"""
+        """Extract file URLs (PDF, CSV, audio, video, etc.) and data source URLs from HTML"""
         soup = BeautifulSoup(html, 'html.parser')
         file_urls = []
 
-        # Find all links
+        # Find all links (a tags)
         for link in soup.find_all('a', href=True):
             href = link['href']
             link_text = link.get_text().lower()
 
             # Check if it's a data file with extension
-            if any(ext in href.lower() for ext in ['.pdf', '.csv', '.xlsx', '.json', '.txt', '.xml']):
+            if any(ext in href.lower() for ext in ['.pdf', '.csv', '.xlsx', '.json', '.txt', '.xml', '.mp3', '.wav', '.opus', '.ogg', '.m4a', '.mp4', '.webm']):
                 file_urls.append(href)
             # Check if the question explicitly asks to scrape/fetch this URL
             elif any(keyword in link_text for keyword in ['data', 'scrape', 'fetch', 'get']):
                 # Exclude submit/navigation links
                 if 'submit' not in href.lower() and 'submit' not in link_text:
                     file_urls.append(href)
+
+        # Also check for audio/video tags with src attributes
+        for tag in soup.find_all(['audio', 'video']):
+            if tag.get('src'):
+                file_urls.append(tag['src'])
 
         return file_urls
 
@@ -228,9 +245,10 @@ class QuizSolver:
             base_url: Base URL for resolving relative URLs
 
         Returns:
-            str: Processed file content as context for LLM
+            dict: Contains 'text' (str) for text context and 'files' (list) for audio/video file paths
         """
         context_parts = []
+        media_files = []  # Store paths to audio/video files for multimodal LLM
         from urllib.parse import urljoin
 
         with BrowserHandler() as browser:
@@ -326,14 +344,28 @@ class QuizSolver:
                             logger.error(f"Error parsing PDF: {pdf_error}")
                             context_parts.append(f"PDF file downloaded but could not be parsed: {url}")
 
-                    # Clean up
-                    if os.path.exists(filename):
+                    elif ext in ['mp3', 'wav', 'opus', 'ogg', 'm4a', 'mp4', 'webm']:
+                        # Audio/Video file - save path for multimodal LLM processing
+                        logger.info(f"Found media file: {filename}")
+                        media_files.append({
+                            'path': filename,
+                            'type': 'audio' if ext in ['mp3', 'wav', 'opus', 'ogg', 'm4a'] else 'video',
+                            'url': url
+                        })
+                        # Don't delete yet - LLM needs to access it
+                        continue
+
+                    # Clean up text-based files (but not media files)
+                    if os.path.exists(filename) and ext not in ['mp3', 'wav', 'opus', 'ogg', 'm4a', 'mp4', 'webm']:
                         os.remove(filename)
 
                 except Exception as e:
                     logger.error(f"Error processing file {url}: {e}")
 
-        return "\n\n".join(context_parts) if context_parts else None
+        return {
+            'text': "\n\n".join(context_parts) if context_parts else None,
+            'media_files': media_files
+        }
 
     def submit_answer(self, submit_url, email, secret, quiz_url, answer):
         """
