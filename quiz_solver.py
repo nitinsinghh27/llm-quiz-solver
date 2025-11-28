@@ -223,9 +223,10 @@ class QuizSolver:
             context = processed['text']
             media_files = processed['media_files']
 
-        # Step 4.5: Check if page has JavaScript modules that need to be fetched
+        # Step 4.5: Check if page has JavaScript that needs to be extracted and executed
         script_matches = re.findall(r'<script[^>]*>(.*?)</script>', html_content, re.DOTALL | re.IGNORECASE)
         has_js_modules = any('import {' in script or 'from "./utils.js"' in script for script in script_matches)
+        has_embedded_js = any('function' in script or 'const' in script or 'let' in script or 'var' in script for script in script_matches)
 
         if has_js_modules and not context:
             logger.info("Detected JavaScript module imports - fetching dependencies and generating Python code")
@@ -315,6 +316,29 @@ IMPORTANT: Return this exactly as a string: "{key_str}" (keep it as an 8-digit s
                 if canvas_text:
                     question_text += "\n\n" + canvas_text
 
+        # Step 4.7: If page has embedded JavaScript (but not modules/canvas), extract and convert to Python
+        elif not context and has_embedded_js and not has_js_modules:
+            logger.info("Detected embedded JavaScript functions - preparing for Python conversion")
+
+            # Combine all scripts
+            page_js = "\n\n".join(script_matches)
+
+            # If question mentions executing a function, prepare for code generation
+            if 'function' in page_js or 'computeSecret' in page_js:
+                context = f"""The page contains JavaScript code that needs to be executed.
+
+JavaScript Code:
+```javascript
+{page_js}
+```
+
+Question: {question_text}
+
+Task: Convert this JavaScript to Python, execute the function(s), and return the final answer."""
+
+                logger.info("Prepared embedded JavaScript for Python conversion")
+                self._needs_js_execution = True
+
         # Step 5: Use LLM to solve the question
         # Priority: If media files exist, use two-stage audio processing (transcript + code generation)
         if media_files:
@@ -393,8 +417,44 @@ IMPORTANT: Return this exactly as a string: "{key_str}" (keep it as an 8-digit s
                 # No CSV data, just use the transcript as the answer
                 formatted_answer = audio_transcript
         else:
+            # Check if we need embedded JavaScript execution
+            if hasattr(self, '_needs_js_execution') and self._needs_js_execution:
+                logger.info("Converting and executing embedded JavaScript")
+                # Extract the JS code from context
+                js_match = re.search(r'```javascript\n(.*?)\n```', context, re.DOTALL)
+                if js_match:
+                    js_code = js_match.group(1)
+
+                    # Generate Python code using simplified conversion (no email/demo2 needed)
+                    python_code = self.llm.convert_embedded_js_to_python(js_code, question_text)
+
+                    if python_code:
+                        try:
+                            # Execute the generated code
+                            namespace = {'__builtins__': __builtins__}
+                            exec(python_code, namespace)
+
+                            if 'result' in namespace:
+                                formatted_answer = namespace['result']
+                                logger.info(f"Embedded JS execution result: {formatted_answer}")
+                            else:
+                                logger.error("Generated code did not produce 'result' variable")
+                                formatted_answer = ""
+                        except Exception as e:
+                            logger.error(f"Error executing embedded JavaScript: {e}", exc_info=True)
+                            logger.error(f"Failed code:\n{python_code}")
+                            formatted_answer = ""
+                    else:
+                        logger.error("LLM did not generate Python code for embedded JS")
+                        formatted_answer = ""
+
+                    # Clear the flag
+                    self._needs_js_execution = False
+                else:
+                    logger.error("Could not extract JavaScript from context")
+                    formatted_answer = ""
             # Check if we need JavaScript-to-Python conversion
-            if hasattr(self, '_needs_js_to_python') and self._needs_js_to_python:
+            elif hasattr(self, '_needs_js_to_python') and self._needs_js_to_python:
                 logger.info("Generating and executing Python code from JavaScript")
                 # Extract the JS code from context
                 js_match = re.search(r'```javascript\n(.*?)\n```', context, re.DOTALL)

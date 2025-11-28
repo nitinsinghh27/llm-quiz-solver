@@ -308,6 +308,76 @@ Question:
             logger.warning(f"Error formatting answer, returning raw: {e}")
             return raw_answer
 
+    def convert_embedded_js_to_python(self, js_code, question_text):
+        """
+        Convert embedded JavaScript code to Python for simple function execution
+
+        Args:
+            js_code: JavaScript code to convert
+            question_text: The quiz question
+
+        Returns:
+            str: Python code that can be executed
+        """
+        try:
+            logger.info("Converting embedded JavaScript to Python")
+
+            system_prompt = """You are a Python code generator. Convert JavaScript code to Python.
+
+Rules:
+1. Convert JavaScript functions to Python functions
+2. Handle basic arithmetic and string operations
+3. Execute the function and store result in 'result' variable
+4. Return ONLY executable Python code, no explanations, no markdown blocks"""
+
+            user_prompt = f"""Convert this JavaScript to Python and execute it:
+
+```javascript
+{js_code}
+```
+
+Question: {question_text}
+
+Generate Python code that:
+1. Converts the JavaScript function(s) to Python
+2. Calls the function(s) to get the answer
+3. Stores the final answer in a variable called 'result'
+
+Return ONLY the Python code."""
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.1,
+                max_tokens=1000
+            )
+
+            content = response.choices[0].message.content
+            if content is None:
+                logger.warning("LLM returned None for embedded JS conversion")
+                return None
+
+            code = content.strip()
+            # Remove markdown code blocks if present
+            if code.startswith('```python'):
+                code = code[len('```python'):].strip()
+            if code.startswith('```'):
+                code = code[3:].strip()
+            if code.endswith('```'):
+                code = code[:-3].strip()
+
+            logger.info(f"Generated Python code:\n{code}")
+            return code
+
+        except Exception as e:
+            logger.error(f"Error converting embedded JS to Python: {e}", exc_info=True)
+            return None
+
     def convert_js_to_python(self, js_code, question_text, email, email_number, demo2_key):
         """
         Convert JavaScript code to Python and return executable Python code
