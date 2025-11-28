@@ -163,6 +163,14 @@ For steganography/LSB extraction questions:
 - Stop at null terminator (byte value 0) or when extracting ASCII printable characters
 - Decode bytes to string (UTF-8 or ASCII)
 
+For nested archive/ZIP extraction questions:
+- Download the archive with email and secret query parameters
+- Use zipfile module to recursively extract nested ZIPs
+- When searching for a file, check if member.endswith('filename.txt') not just equality
+- Files can be in subdirectories like 'folder/subfolder/final_truth.txt'
+- Recursively process nested ZIP files found within archives
+- Read file content and return the text
+
 Instructions:
 1. Read the question and context carefully (including any JavaScript code)
 2. If the question requires calling an API or performing computation, generate Python code
@@ -175,11 +183,12 @@ Instructions:
 9. Otherwise, return ONLY the final answer in the format requested
 
 Code generation rules:
-- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", or "download", generate Python code
+- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", or "ZIP", generate Python code
 - Use requests.get() or requests.post() as appropriate
 - Include email and secret parameters for authentication (as query params: ?email=...&secret=...)
 - For merge conflict detection: compare base vs theirs, base vs ours, and find keys with different modifications
 - For steganography: download image, extract LSB from pixels, convert bits to bytes, decode to string
+- For nested archives: recursively extract ZIPs, use member.endswith() not equality for file matching
 - ALWAYS add error handling: check response.status_code and handle JSON decode errors
 - If an API fails, try alternate approaches or check response.text for debugging
 - Store final answer in 'result' variable
