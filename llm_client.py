@@ -165,12 +165,12 @@ For steganography/LSB extraction questions:
 - Use PIL (Pillow) to open the image
 - Extract LSB (Least Significant Bit) from RGB channels: pixel & 1
 - Collect bits in order: iterate pixels left-to-right, top-to-bottom, extract R then G then B
-- Convert 8 bits to 1 byte using MSB-first ordering: byte = (bit0 << 7) | (bit1 << 6) | ... | bit7
-- OR use: byte_buffer = (byte_buffer << 1) | bit (accumulate left-to-right)
-- Extract at least 100-200 characters before stopping (don't stop too early)
-- IMPORTANT: Only include printable ASCII (32-126) or whitespace (9,10,13,32) in final message
-- Stop at null terminator (byte == 0) or after extracting reasonable length (~200 chars)
-- Filter out any non-printable characters from the final result
+- Convert 8 bits to 1 byte using MSB-first ordering: byte_buffer = (byte_buffer << 1) | bit
+- Extract bytes until you find null terminator (0x00) OR reach ~1000 bytes
+- After extraction, convert bytes to string and filter for printable ASCII only
+- IMPORTANT: Only keep characters that are printable ASCII (32-126) OR whitespace (9,10,13,32)
+- Remove leading/trailing whitespace from final result
+- If result is very short (< 5 chars) or looks like garbage, try extracting more bytes
 - The hidden message is usually at the beginning of the pixel data
 
 For nested archive/ZIP extraction questions:
@@ -186,11 +186,14 @@ For API maze/treasure hunt/graph exploration questions:
 - Track visited locations to avoid infinite loops
 - Start by calling /api/game/start to get initial location
 - For EVERY location (including start), call /api/game/move?to=[LOCATION] to get full details
-- Check for treasure in multiple ways: response.get("treasure"), response.get("has_treasure"), or "treasure" in response
-- Check both boolean flags (treasure: true) and presence of treasure field
-- Add unvisited paths to queue for exploration (paths/neighbors/connections field)
+- Check for treasure with flexible conditions:
+  - If "treasure" key exists and value is truthy (True, non-empty string, etc.)
+  - If "has_treasure" key exists and is truthy
+  - Check: bool(response.get("treasure")) or bool(response.get("has_treasure"))
+- Don't just check if key exists - check if value is truthy
+- Add unvisited paths to queue from "paths", "neighbors", or "connections" field
 - Continue until treasure is found or all locations explored
-- Log/debug: print location names and treasure status to understand the maze structure
+- IMPORTANT: Print location name and full response for debugging
 - Use proper error handling for API calls and check response structure
 
 For network graph analysis questions (networkx):
