@@ -179,6 +179,15 @@ For API maze/treasure hunt/graph exploration questions:
 - Always check the API response for the goal condition before exploring further
 - Use proper error handling for API calls and check response structure
 
+For SQLite database questions:
+- Download the database file using requests.get() with email and secret parameters
+- Save the response.content directly to a file (e.g., "temp_db.sqlite")
+- Connect to the file using sqlite3.connect("temp_db.sqlite")
+- DO NOT try to execute binary data as SQL statements
+- Use parameterized queries with ? placeholders to prevent SQL injection
+- Query the table with SELECT statements to find the required data
+- Close the connection when done
+
 Instructions:
 1. Read the question and context carefully (including any JavaScript code)
 2. If the question requires calling an API or performing computation, generate Python code
@@ -191,13 +200,14 @@ Instructions:
 9. Otherwise, return ONLY the final answer in the format requested
 
 Code generation rules:
-- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", "ZIP", "maze", "treasure", "explore", "navigate", "graph", or "network", generate Python code
+- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", "ZIP", "maze", "treasure", "explore", "navigate", "graph", "network", "database", "SQLite", "SQL", or "query", generate Python code
 - Use requests.get() or requests.post() as appropriate
 - Include email and secret parameters for authentication (as query params: ?email=...&secret=...)
 - For merge conflict detection: compare base vs theirs, base vs ours, and find keys with different modifications
 - For steganography: download image, extract LSB from pixels, convert bits to bytes, decode to string
 - For nested archives: recursively extract ZIPs, use member.endswith() not equality for file matching
 - For maze/treasure hunts: use BFS with queue, check start location first, then explore paths systematically
+- For SQLite databases: download file, save to disk, connect with sqlite3, query with SELECT, use parameterized queries
 - ALWAYS add error handling:
   * Check response.status_code before parsing
   * Verify response is dict/list before accessing keys: isinstance(data, dict)
