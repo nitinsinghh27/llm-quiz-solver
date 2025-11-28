@@ -74,7 +74,7 @@ Do not include explanations unless specifically asked. Just provide the answer."
                         logger.error(f"Error uploading {media_file['path']}: {e}")
 
                 # Build prompt with uploaded files
-                model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+                model = genai.GenerativeModel(model_name="gemini-1.5-flash-latest")
 
                 # Create content parts: text prompt + uploaded files
                 prompt_parts = [f"{system_prompt}\n\n{user_prompt}"]
