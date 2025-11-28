@@ -38,9 +38,9 @@ class LLMClient:
 
             # Build the prompt - simplified for media files to avoid token limits
             if media_files and len(media_files) > 0:
-                system_prompt = """Listen to the audio file and extract the answer.
-Return ONLY the answer - just the number, code, or text mentioned in the audio.
-Do not include any explanations, transcriptions, or additional text."""
+                # Ultra-simplified prompt for audio - no context/CSV data to reduce tokens
+                system_prompt = """What number or code is spoken in the audio? Return only that value."""
+                user_prompt = "Listen to the audio and tell me the number or code mentioned."
             else:
                 system_prompt = """You are a data analysis expert helping to solve quiz questions.
 The questions involve data sourcing, preparation, analysis, and visualization.
@@ -58,10 +58,10 @@ Instructions:
 
 Do not include explanations unless specifically asked. Just provide the answer."""
 
-            user_prompt = f"Question:\n{question_text}"
+                user_prompt = f"Question:\n{question_text}"
 
-            if context:
-                user_prompt += f"\n\nContext/Data:\n{context}"
+                if context:
+                    user_prompt += f"\n\nContext/Data:\n{context}"
 
             # Use Gemini native API for multimodal content (better audio support)
             if media_files and len(media_files) > 0:
