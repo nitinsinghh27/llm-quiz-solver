@@ -173,15 +173,16 @@ class QuizSolver:
                 if csv_match:
                     csv_text = csv_match.group(1)
                     df = pd.read_csv(StringIO(csv_text), sep=r'\s+')  # Assuming space-separated
-                    # Count rows with value > cutoff (assuming single column)
-                    result = len(df[df.iloc[:, 0] > cutoff_value])
+                    # Sum values > cutoff (not count!)
+                    filtered_values = df[df.iloc[:, 0] > cutoff_value].iloc[:, 0]
+                    result = int(filtered_values.sum())
                     formatted_answer = result
-                    logger.info(f"CSV processing result: {formatted_answer} rows with value > {cutoff_value}")
+                    logger.info(f"CSV processing result: sum of {len(filtered_values)} values > {cutoff_value} = {formatted_answer}")
                 else:
                     logger.error("Could not extract CSV data from context")
                     formatted_answer = 0
             except Exception as e:
-                logger.error(f"Error processing CSV with cutoff: {e}")
+                logger.error(f"Error processing CSV with cutoff: {e}", exc_info=True)
                 formatted_answer = 0
 
             # Clean up media files if any were downloaded
@@ -222,10 +223,11 @@ class QuizSolver:
                     if csv_match:
                         csv_text = csv_match.group(1)
                         df = pd.read_csv(StringIO(csv_text), sep=r'\s+')  # Assuming space-separated
-                        # Count rows with value > cutoff (assuming single column)
-                        result = len(df[df.iloc[:, 0] > cutoff])
+                        # Sum values > cutoff (not count!)
+                        filtered_values = df[df.iloc[:, 0] > cutoff].iloc[:, 0]
+                        result = int(filtered_values.sum())
                         formatted_answer = result
-                        logger.info(f"CSV processing result: {formatted_answer}")
+                        logger.info(f"CSV processing result: sum of {len(filtered_values)} values > {cutoff} = {formatted_answer}")
                     else:
                         formatted_answer = audio_code
                 except Exception as e:
