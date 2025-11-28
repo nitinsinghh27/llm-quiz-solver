@@ -260,7 +260,7 @@ class QuizSolver:
                         logger.info(f"Converted relative URL to: {url}")
 
                     # Check if URL has a known file extension
-                    has_extension = any(ext in url.lower() for ext in ['.pdf', '.csv', '.xlsx', '.json', '.txt', '.xml'])
+                    has_extension = any(ext in url.lower() for ext in ['.pdf', '.csv', '.xlsx', '.json', '.txt', '.xml', '.mp3', '.wav', '.opus', '.ogg', '.m4a', '.mp4', '.webm'])
 
                     if not has_extension:
                         # No file extension - check if it's a JavaScript-rendered page

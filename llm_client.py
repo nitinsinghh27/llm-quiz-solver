@@ -1,8 +1,12 @@
 from openai import OpenAI
 import logging
 from config import Config
+import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
+
+# Configure Gemini for multimodal support
+genai.configure(api_key=Config.AIPIPE_API_KEY)
 
 class LLMClient:
     """Handles interaction with LLM API (AIPIPE or OpenAI) for solving quiz questions"""
@@ -54,75 +58,77 @@ Do not include explanations unless specifically asked. Just provide the answer."
             if context:
                 user_prompt += f"\n\nContext/Data:\n{context}"
 
-            # Build messages array
+            # Use Gemini native API for multimodal content (better audio support)
             if media_files and len(media_files) > 0:
-                # For multimodal content, use content array format
-                import base64
+                logger.info("Using Gemini native API for multimodal content")
 
-                content_parts = [{"type": "text", "text": user_prompt}]
-
-                # Add media files as data URIs
+                # Upload files to Gemini
+                uploaded_files = []
                 for media_file in media_files:
                     try:
-                        with open(media_file['path'], 'rb') as f:
-                            file_data = base64.b64encode(f.read()).decode('utf-8')
-
-                        # Determine MIME type
-                        mime_types = {
-                            'opus': 'audio/ogg',  # Opus is typically in ogg container
-                            'mp3': 'audio/mpeg',
-                            'wav': 'audio/wav',
-                            'ogg': 'audio/ogg',
-                            'm4a': 'audio/mp4',
-                            'mp4': 'video/mp4',
-                            'webm': 'video/webm'
-                        }
-                        ext = media_file['path'].split('.')[-1].lower()
-                        mime_type = mime_types.get(ext, 'application/octet-stream')
-
-                        # Add as input_audio for OpenAI-compatible format
-                        # Note: Gemini's OpenAI API supports audio via input_audio
-                        content_parts.append({
-                            "type": "input_audio",
-                            "input_audio": {
-                                "data": file_data,
-                                "format": ext
-                            }
-                        })
-                        logger.info(f"Added {media_file['type']} file: {media_file['path']} ({mime_type})")
+                        logger.info(f"Uploading {media_file['path']} to Gemini...")
+                        uploaded_file = genai.upload_file(media_file['path'])
+                        uploaded_files.append(uploaded_file)
+                        logger.info(f"Uploaded: {uploaded_file.name}")
                     except Exception as e:
-                        logger.error(f"Error encoding media file {media_file['path']}: {e}")
+                        logger.error(f"Error uploading {media_file['path']}: {e}")
 
-                messages = [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": content_parts}
-                ]
+                # Build prompt with uploaded files
+                model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+
+                # Create content parts: text prompt + uploaded files
+                prompt_parts = [f"{system_prompt}\n\n{user_prompt}"]
+                prompt_parts.extend(uploaded_files)
+
+                # Generate response
+                response = model.generate_content(
+                    prompt_parts,
+                    generation_config=genai.types.GenerationConfig(
+                        temperature=0.1,
+                        max_output_tokens=2000,
+                    )
+                )
+
+                answer = response.text.strip()
+                logger.info(f"LLM response: {answer}")
+
+                # Clean up uploaded files
+                for uploaded_file in uploaded_files:
+                    try:
+                        genai.delete_file(uploaded_file.name)
+                        logger.info(f"Deleted uploaded file: {uploaded_file.name}")
+                    except:
+                        pass
+
+                return answer
+
             else:
+                # Use OpenAI-compatible API for text-only queries
                 messages = [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ]
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.1,  # Low temperature for more deterministic answers
-                max_tokens=2000
-            )
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=0.1,  # Low temperature for more deterministic answers
+                    max_tokens=2000
+                )
 
-            # Handle None response (safety filters, refusals, etc.)
-            content = response.choices[0].message.content
-            if content is None:
-                logger.warning("LLM returned None content (possibly safety filter)")
-                # Try to get refusal reason if available
-                if hasattr(response.choices[0].message, 'refusal') and response.choices[0].message.refusal:
-                    logger.warning(f"Refusal reason: {response.choices[0].message.refusal}")
-                return ""
+                # Handle None response (safety filters, refusals, etc.)
+                content = response.choices[0].message.content
+                if content is None:
+                    logger.warning("LLM returned None content (possibly safety filter)")
+                    # Try to get refusal reason if available
+                    if hasattr(response.choices[0].message, 'refusal') and response.choices[0].message.refusal:
+                        logger.warning(f"Refusal reason: {response.choices[0].message.refusal}")
+                    return ""
 
-            answer = content.strip()
-            logger.info(f"LLM response: {answer}")
+                answer = content.strip()
+                logger.info(f"LLM response: {answer}")
 
-            return answer
+                return answer
 
         except Exception as e:
             logger.error(f"Error calling LLM API: {e}", exc_info=True)
