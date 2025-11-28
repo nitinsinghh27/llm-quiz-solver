@@ -149,11 +149,16 @@ For merge conflict questions (version control terminology):
 - This is a technical data comparison task, not related to interpersonal conflict
 
 For semantic search/embedding questions:
-- You may need to call multiple APIs: /api/docs to get documents, /api/embeddings to get embeddings
-- Documents may already include embeddings, or you may need to request them separately
-- If /api/embeddings fails, check if documents already have 'embedding' field
-- Calculate cosine similarity: dot(a,b) / (norm(a) * norm(b))
+- First fetch documents from /api/docs with email and secret parameters
+- Documents should contain 'embedding' field - verify this first
+- For query embedding, there are multiple approaches to try in order:
+  1. Check if /api/docs response includes a special 'query_embedding' field
+  2. Try GET /api/embeddings?text=query&email=...&secret=... (as query params, not POST)
+  3. Try POST /api/embeddings with json={"text": query} and auth as query params
+  4. If all fail (404), use text-based similarity: count matching words between query and doc text
+- Calculate cosine similarity if embeddings available: dot(a,b) / (norm(a) * norm(b))
 - Return the document ID with highest similarity score
+- Always check response structure and handle 404 errors gracefully with fallback approaches
 
 For steganography/LSB extraction questions:
 - Download the image using requests with email and secret as query parameters
@@ -225,6 +230,7 @@ Code generation rules:
 - If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", "ZIP", "maze", "treasure", "explore", "navigate", "graph", "network", "database", "SQLite", "SQL", "query", "fuzzy", "typo", "similar", "match", or "closest", generate Python code
 - Use requests.get() or requests.post() as appropriate
 - Include email and secret parameters for authentication (as query params: ?email=...&secret=...)
+- For semantic search: try multiple approaches for query embedding (check docs response, GET with params, POST with json), fallback to text similarity if 404
 - For merge conflict detection: compare base vs theirs, base vs ours, and find keys with different modifications
 - For steganography: download image, extract LSB from pixels, convert bits to bytes, only keep printable ASCII chars (32-126 plus newline/tab), stop at first non-printable
 - For nested archives: recursively extract ZIPs, use member.endswith() not equality for file matching
