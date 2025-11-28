@@ -258,8 +258,12 @@ emailNumber (first 4 hex of SHA1): {email_number}
 
 Computed answer: {key_str}
 
-Return this 8-digit number as the answer."""
+IMPORTANT: Return this exactly as a string: "{key_str}" (keep it as an 8-digit string, not as an integer)."""
                 logger.info(f"Pre-computed key for {email}: {key_str}")
+
+                # For canvas puzzles, we'll bypass LLM entirely and use pre-computed answer
+                # Store it for later use
+                self._precomputed_canvas_answer = key_str
 
                 # Also update question_text to include canvas text for submit URL extraction
                 if canvas_text:
@@ -343,9 +347,16 @@ Return this 8-digit number as the answer."""
                 # No CSV data, just use the transcript as the answer
                 formatted_answer = audio_transcript
         else:
-            # Text-only quiz - use LLM normally
-            raw_answer = self.llm.solve_question(question_text, context, media_files)
-            formatted_answer = self.llm.extract_answer_format(question_text, raw_answer)
+            # Check if we have a precomputed canvas answer
+            if hasattr(self, '_precomputed_canvas_answer') and self._precomputed_canvas_answer:
+                formatted_answer = self._precomputed_canvas_answer
+                logger.info(f"Using precomputed canvas answer: {formatted_answer}")
+                # Clear it after use
+                self._precomputed_canvas_answer = None
+            else:
+                # Text-only quiz - use LLM normally
+                raw_answer = self.llm.solve_question(question_text, context, media_files)
+                formatted_answer = self.llm.extract_answer_format(question_text, raw_answer)
 
         logger.info(f"Formatted answer: {formatted_answer} (type: {type(formatted_answer).__name__})")
 
