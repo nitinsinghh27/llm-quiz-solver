@@ -40,21 +40,26 @@ class QuizSolver:
         """
         self.start_time = time.time()
         current_url = initial_url
-        attempt = 0
-        max_attempts = 5  # Limit to 5 attempts to avoid rate limiting
+        total_quizzes = 0
+        consecutive_failures = 0
+        max_retries = 5  # Max retries for the SAME failing quiz
 
         logger.info(f"Starting quiz chain from: {initial_url}")
 
-        while current_url and attempt < max_attempts:
-            attempt += 1
-
+        while current_url:
             # Check if we're within time limit
             elapsed_time = time.time() - self.start_time
             if elapsed_time > self.max_time:
                 logger.error(f"Time limit exceeded: {elapsed_time:.2f}s")
                 break
 
-            logger.info(f"Attempt {attempt}: Processing {current_url}")
+            # Check if we've failed too many times on the same quiz
+            if consecutive_failures >= max_retries:
+                logger.error(f"Failed {consecutive_failures} times on same quiz, stopping")
+                break
+
+            total_quizzes += 1
+            logger.info(f"Quiz #{total_quizzes}: Processing {current_url}")
 
             try:
                 # Solve the current quiz
@@ -62,29 +67,43 @@ class QuizSolver:
 
                 if result.get('correct'):
                     logger.info(f"✓ Correct answer for {current_url}")
+                    # Reset failure counter on success
+                    consecutive_failures = 0
+
                     # Move to next URL if provided
-                    current_url = result.get('url')
-                    if not current_url:
+                    next_url = result.get('url')
+                    if not next_url:
                         logger.info("No more URLs, quiz chain completed!")
                         return result
+
+                    # Successfully moving to new quiz
+                    logger.info(f"Moving to next quiz: {next_url}")
+                    current_url = next_url
                 else:
                     logger.warning(f"✗ Incorrect answer: {result.get('reason')}")
                     # The response might still give us a next URL
                     next_url = result.get('url')
                     if next_url and next_url != current_url:
                         logger.info(f"Moving to next quiz despite error: {next_url}")
+                        # Reset failure counter when moving to new quiz
+                        consecutive_failures = 0
                         current_url = next_url
                     else:
                         logger.info("No new URL provided, retrying same quiz")
+                        consecutive_failures += 1
+                        logger.info(f"Retry {consecutive_failures}/{max_retries}")
                         # Retry the same URL (the loop will continue)
                         time.sleep(1)  # Brief pause before retry
 
             except Exception as e:
                 logger.error(f"Error solving quiz {current_url}: {e}", exc_info=True)
-                break
+                consecutive_failures += 1
+                if consecutive_failures >= max_retries:
+                    break
+                time.sleep(1)
 
-        logger.info(f"Quiz chain ended after {attempt} attempts")
-        return {"status": "completed", "attempts": attempt}
+        logger.info(f"Quiz chain ended after {total_quizzes} total quizzes, {consecutive_failures} consecutive failures")
+        return {"status": "completed", "total_quizzes": total_quizzes}
 
     def solve_single_quiz(self, quiz_url, email, secret):
         """
