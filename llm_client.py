@@ -160,8 +160,10 @@ For steganography/LSB extraction questions:
 - Use PIL (Pillow) to open the image
 - Extract LSB (Least Significant Bit) from RGB channels: pixel & 1
 - Collect bits and convert to bytes (8 bits = 1 byte)
-- Stop at null terminator (byte value 0) or when extracting ASCII printable characters
-- Decode bytes to string (UTF-8 or ASCII)
+- IMPORTANT: Check if the extracted character is printable ASCII (32-126) or newline/tab
+- Stop when you encounter a non-printable character (except newline/tab) or null terminator
+- Only include printable characters in the final message
+- The hidden message is usually at the beginning of the pixel data
 
 For nested archive/ZIP extraction questions:
 - Download the archive with email and secret query parameters
@@ -204,7 +206,7 @@ Code generation rules:
 - Use requests.get() or requests.post() as appropriate
 - Include email and secret parameters for authentication (as query params: ?email=...&secret=...)
 - For merge conflict detection: compare base vs theirs, base vs ours, and find keys with different modifications
-- For steganography: download image, extract LSB from pixels, convert bits to bytes, decode to string
+- For steganography: download image, extract LSB from pixels, convert bits to bytes, only keep printable ASCII chars (32-126 plus newline/tab), stop at first non-printable
 - For nested archives: recursively extract ZIPs, use member.endswith() not equality for file matching
 - For maze/treasure hunts: use BFS with queue, check start location first, then explore paths systematically
 - For SQLite databases: download file, save to disk, connect with sqlite3, query with SELECT, use parameterized queries
