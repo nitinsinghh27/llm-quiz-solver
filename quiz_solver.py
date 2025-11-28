@@ -139,19 +139,50 @@ class QuizSolver:
             media_files = processed['media_files']
 
         # Step 5: Use LLM to solve the question
-        raw_answer = self.llm.solve_question(question_text, context, media_files)
+        # For audio files, get the code/cutoff from audio and process CSV locally
+        if media_files:
+            logger.info("Processing audio file to extract code/cutoff value")
+            # Get the code from audio
+            audio_code = self.llm.solve_question(question_text, None, media_files)  # No CSV context
+            logger.info(f"Extracted code from audio: {audio_code}")
 
-        # Clean up media files after LLM processing
-        for media_file in media_files:
-            try:
-                if os.path.exists(media_file['path']):
-                    os.remove(media_file['path'])
-                    logger.info(f"Cleaned up media file: {media_file['path']}")
-            except Exception as e:
-                logger.warning(f"Error cleaning up {media_file['path']}: {e}")
+            # Clean up media files after extraction
+            for media_file in media_files:
+                try:
+                    if os.path.exists(media_file['path']):
+                        os.remove(media_file['path'])
+                        logger.info(f"Cleaned up media file: {media_file['path']}")
+                except Exception as e:
+                    logger.warning(f"Error cleaning up {media_file['path']}: {e}")
 
-        # Step 6: Format the answer appropriately
-        formatted_answer = self.llm.extract_answer_format(question_text, raw_answer)
+            # Now process the CSV with the extracted code
+            if context and 'CSV Data' in context:
+                logger.info(f"Processing CSV with cutoff value: {audio_code}")
+                try:
+                    cutoff = int(audio_code.strip())
+                    # Parse the CSV from context
+                    import pandas as pd
+                    from io import StringIO
+                    # Extract CSV data from context
+                    csv_match = re.search(r'CSV Data:\n(.+?)(?=\n\n|$)', context, re.DOTALL)
+                    if csv_match:
+                        csv_text = csv_match.group(1)
+                        df = pd.read_csv(StringIO(csv_text), sep=r'\s+')  # Assuming space-separated
+                        # Count rows with value > cutoff (assuming single column)
+                        result = len(df[df.iloc[:, 0] > cutoff])
+                        formatted_answer = result
+                        logger.info(f"CSV processing result: {formatted_answer}")
+                    else:
+                        formatted_answer = audio_code
+                except Exception as e:
+                    logger.error(f"Error processing CSV with audio code: {e}")
+                    formatted_answer = audio_code
+            else:
+                formatted_answer = audio_code
+        else:
+            # Text-only quiz - use LLM normally
+            raw_answer = self.llm.solve_question(question_text, context, media_files)
+            formatted_answer = self.llm.extract_answer_format(question_text, raw_answer)
 
         logger.info(f"Formatted answer: {formatted_answer} (type: {type(formatted_answer).__name__})")
 
