@@ -636,10 +636,15 @@ Available credentials:
                 if 'submit' not in href.lower() and 'submit' not in link_text:
                     file_urls.append(href)
 
-        # Also check for audio/video tags with src attributes
+        # Also check for audio/video tags with src attributes or nested source tags
         for tag in soup.find_all(['audio', 'video']):
+            # Check direct src attribute
             if tag.get('src'):
                 file_urls.append(tag['src'])
+            # Check nested source tags
+            for source in tag.find_all('source'):
+                if source.get('src'):
+                    file_urls.append(source['src'])
 
         return file_urls
 
