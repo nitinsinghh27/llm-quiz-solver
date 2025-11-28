@@ -223,8 +223,54 @@ class QuizSolver:
             context = processed['text']
             media_files = processed['media_files']
 
-        # Step 4.5: If question is still unclear (canvas/JS rendering), include HTML source as context
-        if not context and ('<canvas' in html_content.lower() or 'ctx.fill' in html_content.lower()):
+        # Step 4.5: Check if page has JavaScript modules that need to be fetched
+        script_matches = re.findall(r'<script[^>]*>(.*?)</script>', html_content, re.DOTALL | re.IGNORECASE)
+        has_js_modules = any('import {' in script or 'from "./utils.js"' in script for script in script_matches)
+
+        if has_js_modules and not context:
+            logger.info("Detected JavaScript module imports - fetching dependencies and generating Python code")
+
+            # Fetch utils.js
+            utils_content = ""
+            try:
+                from urllib.parse import urljoin
+                utils_url = urljoin(quiz_url, './utils.js')
+                with BrowserHandler() as browser:
+                    utils_content = browser.get_rendered_content(utils_url)
+                logger.info(f"Fetched utils.js ({len(utils_content)} chars)")
+            except Exception as e:
+                logger.warning(f"Could not fetch utils.js: {e}")
+
+            # Combine JS code
+            page_js = "\n\n".join(script_matches)
+            full_js = f"// utils.js content:\n{utils_content}\n\n// Page script:\n{page_js}"
+
+            # Prepare for Python code generation
+            email_number = compute_email_number(email)
+            demo2_key = str(((email_number * 7919 + 12345) % int(1e8))).zfill(8)
+
+            context = f"""Convert this JavaScript code to Python and execute it to solve the problem.
+
+JavaScript Code:
+```javascript
+{full_js}
+```
+
+Question: {question_text}
+
+Known values:
+- email: "{email}"
+- emailNumber: {email_number}
+- demo2Key: "{demo2_key}"
+
+Task: Convert the JavaScript logic to Python, execute it, and return the final answer as a string."""
+
+            logger.info("Prepared JavaScript-to-Python task for LLM")
+            # Mark that we need code generation
+            self._needs_js_to_python = True
+
+        # Step 4.6: If question is still unclear (canvas/JS rendering), include HTML source as context
+        elif not context and ('<canvas' in html_content.lower() or 'ctx.fill' in html_content.lower()):
             logger.info("Detected canvas rendering - including JavaScript source as context")
             # Extract ALL script tags (might have multiple)
             script_matches = re.findall(r'<script[^>]*>(.*?)</script>', html_content, re.DOTALL | re.IGNORECASE)
@@ -347,8 +393,46 @@ IMPORTANT: Return this exactly as a string: "{key_str}" (keep it as an 8-digit s
                 # No CSV data, just use the transcript as the answer
                 formatted_answer = audio_transcript
         else:
+            # Check if we need JavaScript-to-Python conversion
+            if hasattr(self, '_needs_js_to_python') and self._needs_js_to_python:
+                logger.info("Generating and executing Python code from JavaScript")
+                # Extract the JS code from context
+                js_match = re.search(r'```javascript\n(.*?)\n```', context, re.DOTALL)
+                if js_match:
+                    js_code = js_match.group(1)
+                    email_number = compute_email_number(email)
+                    demo2_key = str(((email_number * 7919 + 12345) % int(1e8))).zfill(8)
+
+                    # Generate Python code
+                    python_code = self.llm.convert_js_to_python(js_code, question_text, email, email_number, demo2_key)
+
+                    if python_code:
+                        try:
+                            # Execute the generated code
+                            namespace = {'__builtins__': __builtins__}
+                            exec(python_code, namespace)
+
+                            if 'result' in namespace:
+                                formatted_answer = namespace['result']
+                                logger.info(f"JS-to-Python execution result: {formatted_answer}")
+                            else:
+                                logger.error("Generated code did not produce 'result' variable")
+                                formatted_answer = ""
+                        except Exception as e:
+                            logger.error(f"Error executing generated Python code: {e}", exc_info=True)
+                            logger.error(f"Failed code:\n{python_code}")
+                            formatted_answer = ""
+                    else:
+                        logger.error("LLM did not generate Python code")
+                        formatted_answer = ""
+
+                    # Clear the flag
+                    self._needs_js_to_python = False
+                else:
+                    logger.error("Could not extract JavaScript from context")
+                    formatted_answer = ""
             # Check if we have a precomputed canvas answer
-            if hasattr(self, '_precomputed_canvas_answer') and self._precomputed_canvas_answer:
+            elif hasattr(self, '_precomputed_canvas_answer') and self._precomputed_canvas_answer:
                 formatted_answer = self._precomputed_canvas_answer
                 logger.info(f"Using precomputed canvas answer: {formatted_answer}")
                 # Clear it after use

@@ -290,6 +290,85 @@ Question:
             logger.warning(f"Error formatting answer, returning raw: {e}")
             return raw_answer
 
+    def convert_js_to_python(self, js_code, question_text, email, email_number, demo2_key):
+        """
+        Convert JavaScript code to Python and return executable Python code
+
+        Args:
+            js_code: JavaScript code to convert
+            question_text: The quiz question
+            email: Student email
+            email_number: Computed emailNumber
+            demo2_key: Computed demo2 key
+
+        Returns:
+            str: Python code that can be executed
+        """
+        try:
+            logger.info("Generating Python code from JavaScript")
+
+            system_prompt = """You are a Python code generator. Convert JavaScript code to Python and solve the problem.
+
+Rules:
+1. Convert JavaScript crypto functions to Python hashlib
+2. Handle string concatenation and SHA256 hashing
+3. Extract constants from utils.js (like demo2Blob)
+4. Store the final answer in a variable called 'result'
+5. Return ONLY executable Python code, no explanations"""
+
+            user_prompt = f"""Convert this JavaScript to Python and solve:
+
+{js_code}
+
+Question: {question_text}
+
+Pre-computed values you can use:
+```python
+email = "{email}"
+email_number = {email_number}
+demo2_key = "{demo2_key}"
+```
+
+Generate Python code that:
+1. Extracts any constants from the JavaScript (like demo2Blob)
+2. Performs the required computation (like SHA256 hashing)
+3. Stores the final answer in a variable called 'result'
+
+Return ONLY the Python code, no markdown blocks."""
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.1,
+                max_tokens=1000
+            )
+
+            content = response.choices[0].message.content
+            if content is None:
+                logger.warning("LLM returned None for JS-to-Python conversion")
+                return None
+
+            code = content.strip()
+            # Remove markdown code blocks if present
+            if code.startswith('```python'):
+                code = code[len('```python'):].strip()
+            if code.startswith('```'):
+                code = code[3:].strip()
+            if code.endswith('```'):
+                code = code[:-3].strip()
+
+            logger.info(f"Generated Python code:\n{code}")
+            return code
+
+        except Exception as e:
+            logger.error(f"Error converting JS to Python: {e}", exc_info=True)
+            return None
+
     def diagnose_and_fix_url(self, quiz_url, email, question_text, html_snippet, issues):
         """
         Ask LLM to diagnose page loading issues and suggest URL fix
