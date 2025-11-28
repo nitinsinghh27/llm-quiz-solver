@@ -231,6 +231,18 @@ For fuzzy matching/typo correction questions:
 - Return the exact string from the list (not the target string)
 - Handle edge cases: empty lists, missing keys in dict responses
 
+For data pipeline/join/filtering questions:
+- Fetch data from multiple API endpoints (users, products, orders, etc.)
+- Check if API response is list or dict with 'data'/'items' key
+- If dict, extract array: response.get('data') or response.get('items') or response.get('users')
+- Print/debug the structure of fetched data to verify field names
+- Build lookup dictionaries for efficient joins (e.g., product_id -> price)
+- Filter based on conditions (e.g., tier == 'gold')
+- Join data by matching IDs (user_id, product_id, order_id, etc.)
+- Handle missing/null values gracefully with .get() method
+- Calculate aggregations (sum, count, average) as required
+- Debug: print intermediate results (filtered users, matching orders, etc.)
+
 Instructions:
 1. Read the question and context carefully (including any JavaScript code)
 2. If the question requires calling an API or performing computation, generate Python code
@@ -243,7 +255,7 @@ Instructions:
 9. Otherwise, return ONLY the final answer in the format requested
 
 Code generation rules:
-- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", "ZIP", "maze", "treasure", "explore", "navigate", "graph", "network", "database", "SQLite", "SQL", "query", "fuzzy", "typo", "similar", "match", "closest", "MST", "spanning tree", "adjacency matrix", or "minimum", generate Python code
+- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", "ZIP", "maze", "treasure", "explore", "navigate", "graph", "network", "database", "SQLite", "SQL", "query", "fuzzy", "typo", "similar", "match", "closest", "MST", "spanning tree", "adjacency matrix", "minimum", "join", "filter", "pipeline", "aggregate", or "calculate", generate Python code
 - Use requests.get() or requests.post() as appropriate
 - Include email and secret parameters for authentication (as query params: ?email=...&secret=...)
 - For semantic search: try multiple approaches for query embedding (check docs response, GET with params, POST with json), fallback to text similarity if 404
@@ -255,6 +267,7 @@ Code generation rules:
 - For MST: fetch adjacency matrix, build networkx graph, use nx.minimum_spanning_tree(), sum edge weights - KEEP CODE CONCISE
 - For SQLite databases: download file, save to disk, connect with sqlite3, query with SELECT, use parameterized queries
 - For fuzzy matching: check if API response is dict, extract names array (data.get('names') or data.get('items')), use fuzzywuzzy or difflib for similarity
+- For data pipelines/joins: fetch from multiple endpoints, check if response is dict (extract 'data'/'items' key), print data structure for debugging, use dict lookups for joins
 - ALWAYS add error handling:
   * Check response.status_code before parsing
   * Verify response is dict/list before accessing keys: isinstance(data, dict)
