@@ -282,3 +282,85 @@ Question:
         except Exception as e:
             logger.warning(f"Error formatting answer, returning raw: {e}")
             return raw_answer
+
+    def diagnose_and_fix_url(self, quiz_url, email, question_text, html_snippet, issues):
+        """
+        Ask LLM to diagnose page loading issues and suggest URL fix
+
+        Args:
+            quiz_url: The original quiz URL
+            email: Student email
+            question_text: Extracted question text
+            html_snippet: First part of HTML content
+            issues: List of detected issues
+
+        Returns:
+            dict: {'fixed_url': str or None, 'diagnosis': str}
+        """
+        try:
+            logger.info(f"Diagnosing page issues: {issues}")
+
+            system_prompt = """You are a web debugging expert. Analyze page loading issues and suggest URL fixes.
+Common issues:
+- Pages requiring ?email= parameter in URL
+- JavaScript rendering issues
+- Missing query parameters"""
+
+            user_prompt = f"""A quiz page failed to load properly.
+
+Original URL: {quiz_url}
+Student Email: {email}
+Detected Issues: {', '.join(issues)}
+
+Question Text Extracted:
+{question_text[:500]}
+
+HTML Snippet:
+{html_snippet}
+
+TASK: Determine if the URL needs to be modified (e.g., adding ?email= or &email= parameter).
+
+Respond in JSON format:
+{{"fixed_url": "corrected URL with email parameter if needed", "diagnosis": "brief explanation"}}
+
+If the URL already has ?email= or seems correct, return the original URL unchanged."""
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
+
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.1,
+                max_tokens=400
+            )
+
+            content = response.choices[0].message.content
+            if content:
+                import json
+                import re
+                # Extract JSON from response (handle markdown code blocks)
+                json_match = re.search(r'\{[^{}]*"fixed_url"[^{}]*\}', content, re.DOTALL)
+                if json_match:
+                    result = json.loads(json_match.group(0))
+                    logger.info(f"LLM diagnosis: {result.get('diagnosis')}")
+                    logger.info(f"LLM suggested URL: {result.get('fixed_url')}")
+                    return result
+
+            # Fallback: if LLM fails, try adding email parameter ourselves
+            if '?email=' not in quiz_url.lower() and '&email=' not in quiz_url.lower():
+                separator = '&' if '?' in quiz_url else '?'
+                fixed_url = f"{quiz_url}{separator}email={email}"
+                return {"fixed_url": fixed_url, "diagnosis": "Added missing email parameter"}
+
+            return {"fixed_url": quiz_url, "diagnosis": "URL seems correct"}
+
+        except Exception as e:
+            logger.error(f"Error in URL diagnosis: {e}", exc_info=True)
+            # Fallback: try adding email if not present
+            if '?email=' not in quiz_url.lower():
+                separator = '&' if '?' in quiz_url else '?'
+                return {"fixed_url": f"{quiz_url}{separator}email={email}", "diagnosis": "Error - added email as fallback"}
+            return {"fixed_url": quiz_url, "diagnosis": f"Error: {str(e)}"}

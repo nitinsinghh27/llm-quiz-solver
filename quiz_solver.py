@@ -168,9 +168,49 @@ class QuizSolver:
 
         logger.info(f"Extracted question text:\n{question_text}")
 
+        # Check if page loaded incorrectly (common signs of JavaScript render issues)
+        page_issues = []
+        if "Add ?email=" in question_text or "enable JavaScript" in question_text:
+            page_issues.append("Page requires email parameter or JavaScript")
+        if len(question_text.strip()) < 50:
+            page_issues.append("Question text too short - possible render issue")
+
         # Step 3: Extract submit URL and any file URLs from the question
         submit_url = self.extract_submit_url(question_text, html_content, quiz_url)
         logger.info(f"Submit URL: {submit_url}")
+
+        if not submit_url:
+            page_issues.append("No submit URL found")
+
+        # If we detect issues, ask LLM to analyze and fix
+        if page_issues:
+            logger.warning(f"Detected page issues: {page_issues}")
+            logger.info("Asking LLM to diagnose and suggest fix...")
+
+            fix_suggestion = self.llm.diagnose_and_fix_url(
+                quiz_url=quiz_url,
+                email=email,
+                question_text=question_text,
+                html_snippet=html_content[:2000],
+                issues=page_issues
+            )
+
+            if fix_suggestion.get('fixed_url') and fix_suggestion['fixed_url'] != quiz_url:
+                logger.info(f"LLM suggests trying URL: {fix_suggestion['fixed_url']}")
+                # Retry with fixed URL
+                with BrowserHandler() as browser:
+                    html_content = browser.get_rendered_content(fix_suggestion['fixed_url'])
+
+                soup = BeautifulSoup(html_content, 'html.parser')
+                result_div = soup.find('div', {'id': 'result'}) or soup.find('div', {'id': 'question'})
+                if result_div:
+                    question_text = result_div.get_text(strip=False)
+                else:
+                    question_text = soup.get_text(strip=False)
+
+                submit_url = self.extract_submit_url(question_text, html_content, fix_suggestion['fixed_url'])
+                logger.info(f"After retry - Submit URL: {submit_url}")
+                logger.info(f"After retry - Question text:\n{question_text[:500]}")
 
         # Step 4: Check if there are any files to download
         file_urls = self.extract_file_urls(html_content)
