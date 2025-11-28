@@ -646,6 +646,14 @@ Available credentials:
                 if source.get('src'):
                     file_urls.append(source['src'])
 
+        # Check for image tags (for image analysis questions)
+        for img in soup.find_all('img'):
+            if img.get('src'):
+                src = img['src']
+                # Skip tiny images, base64 data URIs, and common UI elements
+                if not src.startswith('data:') and 'icon' not in src.lower() and 'logo' not in src.lower():
+                    file_urls.append(src)
+
         return file_urls
 
     def process_files(self, file_urls, base_url=None):
@@ -674,7 +682,7 @@ Available credentials:
                         logger.info(f"Converted relative URL to: {url}")
 
                     # Check if URL has a known file extension
-                    has_extension = any(ext in url.lower() for ext in ['.pdf', '.csv', '.xlsx', '.json', '.txt', '.xml', '.mp3', '.wav', '.opus', '.ogg', '.m4a', '.mp4', '.webm'])
+                    has_extension = any(ext in url.lower() for ext in ['.pdf', '.csv', '.xlsx', '.json', '.txt', '.xml', '.mp3', '.wav', '.opus', '.ogg', '.m4a', '.mp4', '.webm', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'])
 
                     if not has_extension:
                         # No file extension - check if it's a JavaScript-rendered page
@@ -821,9 +829,20 @@ Available credentials:
                         # Don't delete yet - LLM needs to access it
                         continue
 
-                    # Clean up text-based files (but not media files or CSV files when media exists)
+                    elif ext in ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp']:
+                        # Image file - save path for vision LLM processing
+                        logger.info(f"Found image file: {filename}")
+                        media_files.append({
+                            'path': filename,
+                            'type': 'image',
+                            'url': url
+                        })
+                        # Don't delete yet - LLM needs to access it
+                        continue
+
+                    # Clean up text-based files (but not media/image files or CSV files when media exists)
                     # If we have media files, keep CSV for later code execution
-                    if os.path.exists(filename) and ext not in ['mp3', 'wav', 'opus', 'ogg', 'm4a', 'mp4', 'webm']:
+                    if os.path.exists(filename) and ext not in ['mp3', 'wav', 'opus', 'ogg', 'm4a', 'mp4', 'webm', 'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp']:
                         # Don't clean up yet - will be cleaned up after code execution
                         pass
 
