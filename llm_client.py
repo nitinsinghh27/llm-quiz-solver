@@ -200,6 +200,16 @@ For SQLite database questions:
 - Query the table with SELECT statements to find the required data
 - Close the connection when done
 
+For fuzzy matching/typo correction questions:
+- Fetch data from API (response may be list or dict with 'names'/'items' key)
+- ALWAYS check response type first: isinstance(data, dict) or isinstance(data, list)
+- If response is dict, extract the data array: data.get('names') or data.get('items') or data.get('data')
+- Use fuzzywuzzy.fuzz.ratio() or difflib.SequenceMatcher for similarity scoring
+- Compare target string against each item in the list
+- Find the item with highest similarity score to target
+- Return the exact string from the list (not the target string)
+- Handle edge cases: empty lists, missing keys in dict responses
+
 Instructions:
 1. Read the question and context carefully (including any JavaScript code)
 2. If the question requires calling an API or performing computation, generate Python code
@@ -212,7 +222,7 @@ Instructions:
 9. Otherwise, return ONLY the final answer in the format requested
 
 Code generation rules:
-- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", "ZIP", "maze", "treasure", "explore", "navigate", "graph", "network", "database", "SQLite", "SQL", or "query", generate Python code
+- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", "ZIP", "maze", "treasure", "explore", "navigate", "graph", "network", "database", "SQLite", "SQL", "query", "fuzzy", "typo", "similar", "match", or "closest", generate Python code
 - Use requests.get() or requests.post() as appropriate
 - Include email and secret parameters for authentication (as query params: ?email=...&secret=...)
 - For merge conflict detection: compare base vs theirs, base vs ours, and find keys with different modifications
@@ -221,6 +231,7 @@ Code generation rules:
 - For maze/treasure hunts: use BFS with queue, call move API for EVERY location (including start), check treasure after each move, explore paths
 - For network graphs: handle flexible edge field names (source/target OR from/to OR u/v), use edge.get() with fallbacks
 - For SQLite databases: download file, save to disk, connect with sqlite3, query with SELECT, use parameterized queries
+- For fuzzy matching: check if API response is dict, extract names array (data.get('names') or data.get('items')), use fuzzywuzzy or difflib for similarity
 - ALWAYS add error handling:
   * Check response.status_code before parsing
   * Verify response is dict/list before accessing keys: isinstance(data, dict)
