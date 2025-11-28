@@ -13,7 +13,7 @@ class LLMClient:
             api_key=Config.AIPIPE_API_KEY,
             base_url=Config.AIPIPE_BASE_URL
         )
-        self.model = "gemini-2.5-flash-preview-05-20"  # Using Gemini 2.5 Flash
+        self.model = "gemini-2.5-flash"  # Using Gemini 2.5 Flash (stable)
 
     def solve_question(self, question_text, context=None):
         """
