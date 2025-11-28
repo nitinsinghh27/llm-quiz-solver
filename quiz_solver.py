@@ -439,8 +439,53 @@ IMPORTANT: Return this exactly as a string: "{key_str}" (keep it as an 8-digit s
                 self._precomputed_canvas_answer = None
             else:
                 # Text-only quiz - use LLM normally
-                raw_answer = self.llm.solve_question(question_text, context, media_files)
-                formatted_answer = self.llm.extract_answer_format(question_text, raw_answer)
+                # Add email and secret to context for API calls
+                enhanced_question = f"""{question_text}
+
+Available credentials:
+- email: {email}
+- secret: {secret}
+- current_page_url: {quiz_url}"""
+
+                raw_answer = self.llm.solve_question(enhanced_question, context, media_files)
+
+                # Check if LLM returned Python code (for API calls or computations)
+                if raw_answer and ('import ' in raw_answer or 'requests.' in raw_answer or 'result =' in raw_answer):
+                    logger.info("LLM returned Python code - executing it")
+                    try:
+                        # Clean up code blocks if present
+                        code = raw_answer.strip()
+                        if code.startswith('```python'):
+                            code = code[len('```python'):].strip()
+                        if code.startswith('```'):
+                            code = code[3:].strip()
+                        if code.endswith('```'):
+                            code = code[:-3].strip()
+
+                        logger.info(f"Executing generated code:\n{code}")
+
+                        # Execute the code with available context
+                        namespace = {
+                            '__builtins__': __builtins__,
+                            'email': email,
+                            'secret': secret,
+                            'quiz_url': quiz_url
+                        }
+                        exec(code, namespace)
+
+                        if 'result' in namespace:
+                            formatted_answer = namespace['result']
+                            logger.info(f"Code execution result: {formatted_answer}")
+                        else:
+                            logger.warning("Code did not produce 'result' variable, using raw answer")
+                            formatted_answer = self.llm.extract_answer_format(question_text, raw_answer)
+                    except Exception as e:
+                        logger.error(f"Error executing LLM-generated code: {e}", exc_info=True)
+                        logger.error(f"Failed code:\n{raw_answer}")
+                        # Fall back to raw answer
+                        formatted_answer = self.llm.extract_answer_format(question_text, raw_answer)
+                else:
+                    formatted_answer = self.llm.extract_answer_format(question_text, raw_answer)
 
         logger.info(f"Formatted answer: {formatted_answer} (type: {type(formatted_answer).__name__})")
 
@@ -475,8 +520,10 @@ IMPORTANT: Return this exactly as a string: "{key_str}" (keep it as an 8-digit s
             logger.info(f"Found relative URL in href '{relative_url}', converted to: {absolute_url}")
             return absolute_url
 
-        # Look for relative URLs in text (e.g., "POST to /submit")
+        # Look for relative URLs in text (e.g., "POST to /submit" or "Post your JSON answer to: /submit/1")
         relative_patterns = [
+            r'POST[^\n]*to\s*:\s*(/[^\s<]+)',  # "POST to: /submit/1"
+            r'Post[^\n]*to\s*:\s*(/[^\s<]+)',  # "Post your answer to: /submit/1"
             r'POST[^\n]*to\s+(/[^\s<]+)',
             r'Post[^\n]*to\s+(/[^\s<]+)',
             r'submit[^\n]*to\s+(/[^\s<]+)',

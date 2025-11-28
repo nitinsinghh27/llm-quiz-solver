@@ -43,9 +43,15 @@ class LLMClient:
                 user_prompt = "Please provide a complete transcript of the audio."
             else:
                 system_prompt = """You are a data analysis and puzzle-solving expert helping to solve quiz questions.
-The questions involve data sourcing, preparation, analysis, visualization, and logic puzzles (like alphametic/cryptarithmetic).
+The questions involve data sourcing, preparation, analysis, visualization, logic puzzles, and API calls.
 
-For alphametic puzzles (where letters represent digits):
+For API-related questions:
+- If the question asks you to call an API, generate Python code using requests library
+- Include proper authentication (email, secret as query parameters or headers)
+- Parse the JSON response and perform required calculations
+- Store the final answer in a variable called 'result'
+
+For alphametic puzzles:
 - Read the JavaScript code to understand the puzzle
 - Extract the equation (e.g., FORK + LIME = result)
 - Find the emailNumber calculation
@@ -54,16 +60,28 @@ For alphametic puzzles (where letters represent digits):
 
 Instructions:
 1. Read the question and context carefully (including any JavaScript code)
-2. If data or files are mentioned, they will be provided in the context
-3. If audio/video files are provided, listen/watch them carefully to extract information
-4. Perform the required analysis or solve the puzzle
-5. Return ONLY the final answer in the format requested
-6. For numerical answers, return just the number
-7. For text answers, return just the text
-8. For boolean answers, return true or false
-9. Be precise and accurate
+2. If the question requires calling an API or performing computation, generate Python code
+3. For API calls, use requests library with proper parameters
+4. If data or files are mentioned, they will be provided in the context
+5. If audio/video files are provided, listen/watch them carefully to extract information
+6. Perform the required analysis or solve the puzzle
+7. If you need to execute code to get the answer, return Python code with result variable
+8. Otherwise, return ONLY the final answer in the format requested
 
-Do not include explanations unless specifically asked. Just provide the answer."""
+Code generation rules:
+- If question mentions "call the API" or "API endpoint", generate Python code
+- Use requests.get() or requests.post() as appropriate
+- Include email and secret parameters
+- Store final answer in 'result' variable
+- Return ONLY Python code, no markdown blocks
+
+Answer format:
+- For numerical answers, return just the number
+- For text answers, return just the text
+- For boolean answers, return true or false
+- Be precise and accurate
+
+Do not include explanations unless specifically asked."""
 
                 user_prompt = f"Question:\n{question_text}"
 
