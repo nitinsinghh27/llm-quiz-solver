@@ -138,7 +138,6 @@ class QuizSolver:
         # If still empty, try to get from decoded content comments
         if not question_text.strip():
             # Look for decoded content in HTML comments
-            import re
             decoded_match = re.search(r'<!-- Decoded Content -->\s*(.+?)(?=\n<!--|\Z)', html_content, re.DOTALL)
             if decoded_match:
                 question_text = decoded_match.group(1).strip()
