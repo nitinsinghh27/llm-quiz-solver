@@ -172,11 +172,11 @@ class QuizSolver:
                 if csv_match:
                     csv_text = csv_match.group(1)
                     df = pd.read_csv(StringIO(csv_text), sep=r'\s+')  # Assuming space-separated
-                    # Sum values > cutoff (not count!)
-                    filtered_values = df[df.iloc[:, 0] > cutoff_value].iloc[:, 0]
+                    # Sum values >= cutoff (greater than or equal to)
+                    filtered_values = df[df.iloc[:, 0] >= cutoff_value].iloc[:, 0]
                     result = int(filtered_values.sum())
                     formatted_answer = result
-                    logger.info(f"CSV processing result: sum of {len(filtered_values)} values > {cutoff_value} = {formatted_answer}")
+                    logger.info(f"CSV processing result: sum of {len(filtered_values)} values >= {cutoff_value} = {formatted_answer}")
                 else:
                     logger.error("Could not extract CSV data from context")
                     formatted_answer = 0
@@ -222,11 +222,11 @@ class QuizSolver:
                     if csv_match:
                         csv_text = csv_match.group(1)
                         df = pd.read_csv(StringIO(csv_text), sep=r'\s+')  # Assuming space-separated
-                        # Sum values > cutoff (not count!)
-                        filtered_values = df[df.iloc[:, 0] > cutoff].iloc[:, 0]
+                        # Sum values >= cutoff (greater than or equal to)
+                        filtered_values = df[df.iloc[:, 0] >= cutoff].iloc[:, 0]
                         result = int(filtered_values.sum())
                         formatted_answer = result
-                        logger.info(f"CSV processing result: sum of {len(filtered_values)} values > {cutoff} = {formatted_answer}")
+                        logger.info(f"CSV processing result: sum of {len(filtered_values)} values >= {cutoff} = {formatted_answer}")
                     else:
                         formatted_answer = audio_code
                 except Exception as e:
