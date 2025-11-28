@@ -36,8 +36,13 @@ class LLMClient:
             if media_files:
                 logger.info(f"Including {len(media_files)} media file(s)")
 
-            # Build the prompt
-            system_prompt = """You are a data analysis expert helping to solve quiz questions.
+            # Build the prompt - simplified for media files to avoid token limits
+            if media_files and len(media_files) > 0:
+                system_prompt = """Listen to the audio file and extract the answer.
+Return ONLY the answer - just the number, code, or text mentioned in the audio.
+Do not include any explanations, transcriptions, or additional text."""
+            else:
+                system_prompt = """You are a data analysis expert helping to solve quiz questions.
 The questions involve data sourcing, preparation, analysis, and visualization.
 
 Instructions:
@@ -86,7 +91,7 @@ Do not include explanations unless specifically asked. Just provide the answer."
                     prompt_parts,
                     generation_config=genai.types.GenerationConfig(
                         temperature=0.1,
-                        max_output_tokens=2000,
+                        max_output_tokens=100,  # Reduced - we only need the answer, not full transcription
                     ),
                     safety_settings={
                         genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
@@ -98,11 +103,15 @@ Do not include explanations unless specifically asked. Just provide the answer."
 
                 # Check if response was blocked or empty
                 if not response.candidates or not response.candidates[0].content.parts:
-                    logger.error(f"Gemini response was blocked or empty. Finish reason: {response.candidates[0].finish_reason if response.candidates else 'No candidates'}")
+                    finish_reason = response.candidates[0].finish_reason if response.candidates else 'No candidates'
+                    logger.error(f"Gemini response was blocked or empty. Finish reason: {finish_reason}")
                     logger.error(f"Full response: {response}")
                     # Try to extract any feedback or prompt feedback
                     if hasattr(response, 'prompt_feedback'):
                         logger.error(f"Prompt feedback: {response.prompt_feedback}")
+
+                    # If finish_reason is MAX_TOKENS, it means we hit the limit but there might be partial content
+                    # However, without content.parts, we can't extract anything
                     return ""
 
                 answer = response.text.strip()
