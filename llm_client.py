@@ -176,9 +176,11 @@ For nested archive/ZIP extraction questions:
 For API maze/treasure hunt/graph exploration questions:
 - Use BFS (breadth-first search) with a queue to explore all locations
 - Track visited locations to avoid infinite loops
-- Check EACH location for the treasure/goal AFTER moving to it
-- The start location should be checked first, then add its paths to the queue
-- Always check the API response for the goal condition before exploring further
+- Start by calling /api/game/start to get initial location
+- For EVERY location (including start), call /api/game/move?to=[LOCATION] to get full details
+- Check if location has treasure AFTER calling move API (not just from start response)
+- Add unvisited paths to queue for exploration
+- Continue until treasure is found or all locations explored
 - Use proper error handling for API calls and check response structure
 
 For network graph analysis questions (networkx):
@@ -216,7 +218,7 @@ Code generation rules:
 - For merge conflict detection: compare base vs theirs, base vs ours, and find keys with different modifications
 - For steganography: download image, extract LSB from pixels, convert bits to bytes, only keep printable ASCII chars (32-126 plus newline/tab), stop at first non-printable
 - For nested archives: recursively extract ZIPs, use member.endswith() not equality for file matching
-- For maze/treasure hunts: use BFS with queue, check start location first, then explore paths systematically
+- For maze/treasure hunts: use BFS with queue, call move API for EVERY location (including start), check treasure after each move, explore paths
 - For network graphs: handle flexible edge field names (source/target OR from/to OR u/v), use edge.get() with fallbacks
 - For SQLite databases: download file, save to disk, connect with sqlite3, query with SELECT, use parameterized queries
 - ALWAYS add error handling:
