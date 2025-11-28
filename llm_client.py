@@ -89,10 +89,10 @@ Do not include explanations unless specifically asked. Just provide the answer."
                         max_output_tokens=2000,
                     ),
                     safety_settings={
-                        'HARASSMENT': 'BLOCK_NONE',
-                        'HATE_SPEECH': 'BLOCK_NONE',
-                        'SEXUALLY_EXPLICIT': 'BLOCK_NONE',
-                        'DANGEROUS_CONTENT': 'BLOCK_NONE',
+                        genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+                        genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH: genai.types.HarmBlockThreshold.BLOCK_NONE,
+                        genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: genai.types.HarmBlockThreshold.BLOCK_NONE,
+                        genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: genai.types.HarmBlockThreshold.BLOCK_NONE,
                     }
                 )
 
