@@ -62,7 +62,16 @@ Do not include explanations unless specifically asked. Just provide the answer."
                 max_tokens=2000
             )
 
-            answer = response.choices[0].message.content.strip()
+            # Handle None response (safety filters, refusals, etc.)
+            content = response.choices[0].message.content
+            if content is None:
+                logger.warning("LLM returned None content (possibly safety filter)")
+                # Try to get refusal reason if available
+                if hasattr(response.choices[0].message, 'refusal') and response.choices[0].message.refusal:
+                    logger.warning(f"Refusal reason: {response.choices[0].message.refusal}")
+                return ""
+
+            answer = content.strip()
             logger.info(f"LLM response: {answer}")
 
             return answer
