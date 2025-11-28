@@ -243,6 +243,16 @@ For data pipeline/join/filtering questions:
 - Calculate aggregations (sum, count, average) as required
 - Debug: print intermediate results (filtered users, matching orders, etc.)
 
+For spatial/geometric analysis questions (distance, coordinates):
+- Fetch location/point data from API
+- Check if response is list or dict with 'data'/'locations'/'points' key
+- If dict, extract array: response.get('locations') or response.get('data') or response.get('points')
+- IMPORTANT: Print the response structure to identify field names
+- Look for points with flexible field names: 'id'/'name'/'label' for identifier, 'point'/'coordinates'/'location' for [x,y]
+- Calculate Euclidean distance: sqrt((x2-x1)^2 + (y2-y1)^2)
+- Round results to specified decimal places
+- Handle missing coordinates gracefully with error messages
+
 Instructions:
 1. Read the question and context carefully (including any JavaScript code)
 2. If the question requires calling an API or performing computation, generate Python code
@@ -255,7 +265,7 @@ Instructions:
 9. Otherwise, return ONLY the final answer in the format requested
 
 Code generation rules:
-- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", "ZIP", "maze", "treasure", "explore", "navigate", "graph", "network", "database", "SQLite", "SQL", "query", "fuzzy", "typo", "similar", "match", "closest", "MST", "spanning tree", "adjacency matrix", "minimum", "join", "filter", "pipeline", "aggregate", or "calculate", generate Python code
+- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", "ZIP", "maze", "treasure", "explore", "navigate", "graph", "network", "database", "SQLite", "SQL", "query", "fuzzy", "typo", "similar", "match", "closest", "MST", "spanning tree", "adjacency matrix", "minimum", "join", "filter", "pipeline", "aggregate", "calculate", "distance", "Euclidean", "spatial", "coordinates", or "geometric", generate Python code
 - Use requests.get() or requests.post() as appropriate
 - Include email and secret parameters for authentication (as query params: ?email=...&secret=...)
 - For semantic search: try multiple approaches for query embedding (check docs response, GET with params, POST with json), fallback to text similarity if 404
@@ -268,6 +278,7 @@ Code generation rules:
 - For SQLite databases: download file, save to disk, connect with sqlite3, query with SELECT, use parameterized queries
 - For fuzzy matching: check if API response is dict, extract names array (data.get('names') or data.get('items')), use fuzzywuzzy or difflib for similarity
 - For data pipelines/joins: fetch from multiple endpoints, check if response is dict (extract 'data'/'items' key), print data structure for debugging, use dict lookups for joins
+- For spatial/distance: check if response is dict (extract 'locations'/'data'/'points'), print structure, look for flexible field names (id/name for identifier, point/coordinates for [x,y])
 - ALWAYS add error handling:
   * Check response.status_code before parsing
   * Verify response is dict/list before accessing keys: isinstance(data, dict)
