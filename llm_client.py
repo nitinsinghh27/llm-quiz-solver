@@ -189,7 +189,11 @@ Code generation rules:
 - For merge conflict detection: compare base vs theirs, base vs ours, and find keys with different modifications
 - For steganography: download image, extract LSB from pixels, convert bits to bytes, decode to string
 - For nested archives: recursively extract ZIPs, use member.endswith() not equality for file matching
-- ALWAYS add error handling: check response.status_code and handle JSON decode errors
+- ALWAYS add error handling:
+  * Check response.status_code before parsing
+  * Verify response is dict/list before accessing keys: isinstance(data, dict)
+  * Print response.text if unexpected format for debugging
+  * Handle JSONDecodeError exceptions
 - If an API fails, try alternate approaches or check response.text for debugging
 - Store final answer in 'result' variable
 - Return ONLY Python code, no markdown blocks
