@@ -164,10 +164,13 @@ For steganography/LSB extraction questions:
 - Download the image using requests with email and secret as query parameters
 - Use PIL (Pillow) to open the image
 - Extract LSB (Least Significant Bit) from RGB channels: pixel & 1
-- Collect bits and convert to bytes (8 bits = 1 byte)
-- IMPORTANT: Check if the extracted character is printable ASCII (32-126) or newline/tab
-- Stop when you encounter a non-printable character (except newline/tab) or null terminator
-- Only include printable characters in the final message
+- Collect bits in order: iterate pixels left-to-right, top-to-bottom, extract R then G then B
+- Convert 8 bits to 1 byte using MSB-first ordering: byte = (bit0 << 7) | (bit1 << 6) | ... | bit7
+- OR use: byte_buffer = (byte_buffer << 1) | bit (accumulate left-to-right)
+- Extract at least 100-200 characters before stopping (don't stop too early)
+- IMPORTANT: Only include printable ASCII (32-126) or whitespace (9,10,13,32) in final message
+- Stop at null terminator (byte == 0) or after extracting reasonable length (~200 chars)
+- Filter out any non-printable characters from the final result
 - The hidden message is usually at the beginning of the pixel data
 
 For nested archive/ZIP extraction questions:
@@ -240,7 +243,7 @@ Code generation rules:
 - Include email and secret parameters for authentication (as query params: ?email=...&secret=...)
 - For semantic search: try multiple approaches for query embedding (check docs response, GET with params, POST with json), fallback to text similarity if 404
 - For merge conflict detection: compare base vs theirs, base vs ours, and find keys with different modifications
-- For steganography: download image, extract LSB from pixels, convert bits to bytes, only keep printable ASCII chars (32-126 plus newline/tab), stop at first non-printable
+- For steganography: download image, extract LSB from RGB pixels in order, accumulate bits into bytes with << 1, extract 100-200 chars minimum, filter non-printable at end
 - For nested archives: recursively extract ZIPs, use member.endswith() not equality for file matching
 - For maze/treasure hunts: use BFS with queue, call move API for EVERY location (including start), check treasure after each move, explore paths
 - For network graphs: handle flexible edge field names (source/target OR from/to OR u/v), use edge.get() with fallbacks
