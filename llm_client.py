@@ -186,9 +186,11 @@ For API maze/treasure hunt/graph exploration questions:
 - Track visited locations to avoid infinite loops
 - Start by calling /api/game/start to get initial location
 - For EVERY location (including start), call /api/game/move?to=[LOCATION] to get full details
-- Check if location has treasure AFTER calling move API (not just from start response)
-- Add unvisited paths to queue for exploration
+- Check for treasure in multiple ways: response.get("treasure"), response.get("has_treasure"), or "treasure" in response
+- Check both boolean flags (treasure: true) and presence of treasure field
+- Add unvisited paths to queue for exploration (paths/neighbors/connections field)
 - Continue until treasure is found or all locations explored
+- Log/debug: print location names and treasure status to understand the maze structure
 - Use proper error handling for API calls and check response structure
 
 For network graph analysis questions (networkx):
@@ -245,7 +247,7 @@ Code generation rules:
 - For merge conflict detection: compare base vs theirs, base vs ours, and find keys with different modifications
 - For steganography: download image, extract LSB from RGB pixels in order, accumulate bits into bytes with << 1, extract 100-200 chars minimum, filter non-printable at end
 - For nested archives: recursively extract ZIPs, use member.endswith() not equality for file matching
-- For maze/treasure hunts: use BFS with queue, call move API for EVERY location (including start), check treasure after each move, explore paths
+- For maze/treasure hunts: use BFS with queue, call move API for EVERY location (including start), check multiple treasure field names (treasure/has_treasure/"treasure" in response), add debug output
 - For network graphs: handle flexible edge field names (source/target OR from/to OR u/v), use edge.get() with fallbacks
 - For MST: fetch adjacency matrix, build networkx graph, use nx.minimum_spanning_tree(), sum edge weights - KEEP CODE CONCISE
 - For SQLite databases: download file, save to disk, connect with sqlite3, query with SELECT, use parameterized queries
