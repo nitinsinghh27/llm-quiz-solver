@@ -194,8 +194,9 @@ Code generation rules:
   * Verify response is dict/list before accessing keys: isinstance(data, dict)
   * Print response.text if unexpected format for debugging
   * Handle JSONDecodeError exceptions
+  * NEVER use exit() or sys.exit() - just set result variable and continue
 - If an API fails, try alternate approaches or check response.text for debugging
-- Store final answer in 'result' variable
+- Store final answer in 'result' variable (even if it's an error message)
 - Return ONLY Python code, no markdown blocks
 
 Answer format:
