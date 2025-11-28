@@ -171,6 +171,14 @@ For nested archive/ZIP extraction questions:
 - Recursively process nested ZIP files found within archives
 - Read file content and return the text
 
+For API maze/treasure hunt/graph exploration questions:
+- Use BFS (breadth-first search) with a queue to explore all locations
+- Track visited locations to avoid infinite loops
+- Check EACH location for the treasure/goal AFTER moving to it
+- The start location should be checked first, then add its paths to the queue
+- Always check the API response for the goal condition before exploring further
+- Use proper error handling for API calls and check response structure
+
 Instructions:
 1. Read the question and context carefully (including any JavaScript code)
 2. If the question requires calling an API or performing computation, generate Python code
@@ -183,12 +191,13 @@ Instructions:
 9. Otherwise, return ONLY the final answer in the format requested
 
 Code generation rules:
-- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", or "ZIP", generate Python code
+- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", "ZIP", "maze", "treasure", "explore", "navigate", "graph", or "network", generate Python code
 - Use requests.get() or requests.post() as appropriate
 - Include email and secret parameters for authentication (as query params: ?email=...&secret=...)
 - For merge conflict detection: compare base vs theirs, base vs ours, and find keys with different modifications
 - For steganography: download image, extract LSB from pixels, convert bits to bytes, decode to string
 - For nested archives: recursively extract ZIPs, use member.endswith() not equality for file matching
+- For maze/treasure hunts: use BFS with queue, check start location first, then explore paths systematically
 - ALWAYS add error handling:
   * Check response.status_code before parsing
   * Verify response is dict/list before accessing keys: isinstance(data, dict)
