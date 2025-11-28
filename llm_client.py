@@ -81,14 +81,29 @@ Do not include explanations unless specifically asked. Just provide the answer."
                 prompt_parts = [f"{system_prompt}\n\n{user_prompt}"]
                 prompt_parts.extend(uploaded_files)
 
-                # Generate response
+                # Generate response with safety settings
                 response = model.generate_content(
                     prompt_parts,
                     generation_config=genai.types.GenerationConfig(
                         temperature=0.1,
                         max_output_tokens=2000,
-                    )
+                    ),
+                    safety_settings={
+                        'HARASSMENT': 'BLOCK_NONE',
+                        'HATE_SPEECH': 'BLOCK_NONE',
+                        'SEXUALLY_EXPLICIT': 'BLOCK_NONE',
+                        'DANGEROUS_CONTENT': 'BLOCK_NONE',
+                    }
                 )
+
+                # Check if response was blocked or empty
+                if not response.candidates or not response.candidates[0].content.parts:
+                    logger.error(f"Gemini response was blocked or empty. Finish reason: {response.candidates[0].finish_reason if response.candidates else 'No candidates'}")
+                    logger.error(f"Full response: {response}")
+                    # Try to extract any feedback or prompt feedback
+                    if hasattr(response, 'prompt_feedback'):
+                        logger.error(f"Prompt feedback: {response.prompt_feedback}")
+                    return ""
 
                 answer = response.text.strip()
                 logger.info(f"LLM response: {answer}")
