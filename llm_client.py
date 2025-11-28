@@ -12,12 +12,67 @@ class LLMClient:
     """Handles interaction with LLM API (AIPIPE or OpenAI) for solving quiz questions"""
 
     def __init__(self):
-        # Initialize OpenAI client with Gemini endpoint
+        # Get all available API keys
+        self.api_keys = Config.get_api_keys()
+        self.current_key_index = 0
+
+        # Initialize OpenAI client with first API key
         self.client = OpenAI(
-            api_key=Config.AIPIPE_API_KEY,
+            api_key=self.api_keys[0],
             base_url=Config.AIPIPE_BASE_URL
         )
         self.model = "gemini-2.5-flash"  # Using Gemini 2.5 Flash (stable)
+        logger.info(f"Initialized LLM client with {len(self.api_keys)} API key(s)")
+
+    def _rotate_api_key(self):
+        """Rotate to the next API key"""
+        if len(self.api_keys) <= 1:
+            logger.warning("Only one API key available, cannot rotate")
+            return False
+
+        self.current_key_index = (self.current_key_index + 1) % len(self.api_keys)
+        new_key = self.api_keys[self.current_key_index]
+
+        # Reinitialize client with new key
+        self.client = OpenAI(
+            api_key=new_key,
+            base_url=Config.AIPIPE_BASE_URL
+        )
+        # Also update genai for multimodal
+        genai.configure(api_key=new_key)
+
+        logger.info(f"Rotated to API key #{self.current_key_index + 1}")
+        return True
+
+    def _call_with_retry(self, api_call_func, max_retries=2):
+        """
+        Execute API call with automatic retry and key rotation on rate limit
+
+        Args:
+            api_call_func: Function that makes the API call
+            max_retries: Maximum number of retries (including key rotations)
+
+        Returns:
+            API response
+        """
+        from openai import RateLimitError
+
+        for attempt in range(max_retries):
+            try:
+                return api_call_func()
+            except RateLimitError as e:
+                logger.warning(f"Rate limit hit (attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    # Try rotating API key
+                    if self._rotate_api_key():
+                        logger.info("Retrying with new API key...")
+                        continue
+                    else:
+                        logger.error("Cannot rotate API key, re-raising error")
+                        raise
+                else:
+                    logger.error("Max retries reached, re-raising error")
+                    raise
 
     def solve_question(self, question_text, context=None, media_files=None):
         """
@@ -159,12 +214,15 @@ Do not include explanations unless specifically asked."""
                     {"role": "user", "content": user_prompt}
                 ]
 
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    temperature=0.1,  # Low temperature for more deterministic answers
-                    max_tokens=2000
-                )
+                def make_api_call():
+                    return self.client.chat.completions.create(
+                        model=self.model,
+                        messages=messages,
+                        temperature=0.1,  # Low temperature for more deterministic answers
+                        max_tokens=2000
+                    )
+
+                response = self._call_with_retry(make_api_call)
 
                 # Handle None response (safety filters, refusals, etc.)
                 content = response.choices[0].message.content
@@ -350,13 +408,15 @@ Return ONLY the Python code."""
                 {"role": "user", "content": user_prompt}
             ]
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.1,
-                max_tokens=1000
-            )
+            def make_api_call():
+                return self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=0.1,
+                    max_tokens=1000
+                )
 
+            response = self._call_with_retry(make_api_call)
             content = response.choices[0].message.content
             if content is None:
                 logger.warning("LLM returned None for embedded JS conversion")
@@ -429,13 +489,15 @@ Return ONLY the Python code, no markdown blocks."""
                 {"role": "user", "content": user_prompt}
             ]
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.1,
-                max_tokens=1000
-            )
+            def make_api_call():
+                return self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=0.1,
+                    max_tokens=1000
+                )
 
+            response = self._call_with_retry(make_api_call)
             content = response.choices[0].message.content
             if content is None:
                 logger.warning("LLM returned None for JS-to-Python conversion")
@@ -504,13 +566,15 @@ If the URL already has ?email= or seems correct, return the original URL unchang
                 {"role": "user", "content": user_prompt}
             ]
 
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.1,
-                max_tokens=400
-            )
+            def make_api_call():
+                return self.client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=0.1,
+                    max_tokens=400
+                )
 
+            response = self._call_with_retry(make_api_call)
             content = response.choices[0].message.content
             if content:
                 import json

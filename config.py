@@ -7,8 +7,19 @@ class Config:
     SECRET = os.getenv('SECRET')
     EMAIL = os.getenv('EMAIL')
     AIPIPE_API_KEY = os.getenv('AIPIPE_API_KEY')
+    AIPIPE_API_KEY_2 = os.getenv('AIPIPE_API_KEY_2')  # Optional second API key
     AIPIPE_BASE_URL = os.getenv('AIPIPE_BASE_URL', 'https://generativelanguage.googleapis.com/v1beta/openai/')
     PORT = int(os.getenv('PORT', 5000))
+
+    @classmethod
+    def get_api_keys(cls):
+        """Get list of available API keys"""
+        keys = []
+        if cls.AIPIPE_API_KEY:
+            keys.append(cls.AIPIPE_API_KEY)
+        if cls.AIPIPE_API_KEY_2:
+            keys.append(cls.AIPIPE_API_KEY_2)
+        return keys
 
     @classmethod
     def validate(cls):
