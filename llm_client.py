@@ -142,6 +142,12 @@ For alphametic puzzles:
 - Calculate the key using: ((emailNumber * 7919 + 12345) mod 1e8)
 - Convert the key to digits and map them to the required letter sequence
 
+For merge conflict questions (version control terminology):
+- "Merge conflict" refers to Git/version control scenarios where code changes conflict
+- You will receive 'base', 'theirs', and 'ours' configurations (JSON objects)
+- Identify keys where both 'theirs' and 'ours' modified 'base' differently
+- This is a technical data comparison task, not related to interpersonal conflict
+
 Instructions:
 1. Read the question and context carefully (including any JavaScript code)
 2. If the question requires calling an API or performing computation, generate Python code
@@ -154,9 +160,10 @@ Instructions:
 9. Otherwise, return ONLY the final answer in the format requested
 
 Code generation rules:
-- If question mentions "call the API" or "API endpoint", generate Python code
+- If question mentions "call the API", "API endpoint", "fetch", or "merge conflict", generate Python code
 - Use requests.get() or requests.post() as appropriate
 - Include email and secret parameters for authentication
+- For merge conflict detection: compare base vs theirs, base vs ours, and find keys with different modifications
 - Store final answer in 'result' variable
 - Return ONLY Python code, no markdown blocks
 
