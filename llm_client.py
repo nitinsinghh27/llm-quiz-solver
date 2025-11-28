@@ -181,6 +181,14 @@ For API maze/treasure hunt/graph exploration questions:
 - Always check the API response for the goal condition before exploring further
 - Use proper error handling for API calls and check response structure
 
+For network graph analysis questions (networkx):
+- Fetch graph data from API (nodes and edges with weights)
+- Edge fields may vary: try 'source'/'target' OR 'from'/'to' OR 'u'/'v'
+- Use flexible field access: edge.get('source') or edge.get('from') or edge.get('u')
+- Build graph with networkx, add edges with weights
+- Use nx.shortest_path_length(G, source, target, weight='weight') for shortest path
+- Handle missing nodes/edges and NetworkXNoPath exceptions
+
 For SQLite database questions:
 - Download the database file using requests.get() with email and secret parameters
 - Save the response.content directly to a file (e.g., "temp_db.sqlite")
@@ -209,6 +217,7 @@ Code generation rules:
 - For steganography: download image, extract LSB from pixels, convert bits to bytes, only keep printable ASCII chars (32-126 plus newline/tab), stop at first non-printable
 - For nested archives: recursively extract ZIPs, use member.endswith() not equality for file matching
 - For maze/treasure hunts: use BFS with queue, check start location first, then explore paths systematically
+- For network graphs: handle flexible edge field names (source/target OR from/to OR u/v), use edge.get() with fallbacks
 - For SQLite databases: download file, save to disk, connect with sqlite3, query with SELECT, use parameterized queries
 - ALWAYS add error handling:
   * Check response.status_code before parsing
