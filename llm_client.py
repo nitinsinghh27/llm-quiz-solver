@@ -196,6 +196,14 @@ For network graph analysis questions (networkx):
 - Use nx.shortest_path_length(G, source, target, weight='weight') for shortest path
 - Handle missing nodes/edges and NetworkXNoPath exceptions
 
+For Minimum Spanning Tree (MST) questions:
+- Fetch adjacency matrix from API (usually /api/matrix)
+- Matrix is typically a 2D array where matrix[i][j] is the weight between nodes i and j
+- Use networkx: create graph with nx.Graph(), add weighted edges from matrix
+- Calculate MST using nx.minimum_spanning_tree(G, weight='weight')
+- Sum all edge weights in MST to get total cost
+- IMPORTANT: Keep code concise - use simple loops, avoid verbose comments
+
 For SQLite database questions:
 - Download the database file using requests.get() with email and secret parameters
 - Save the response.content directly to a file (e.g., "temp_db.sqlite")
@@ -227,7 +235,7 @@ Instructions:
 9. Otherwise, return ONLY the final answer in the format requested
 
 Code generation rules:
-- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", "ZIP", "maze", "treasure", "explore", "navigate", "graph", "network", "database", "SQLite", "SQL", "query", "fuzzy", "typo", "similar", "match", or "closest", generate Python code
+- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", "ZIP", "maze", "treasure", "explore", "navigate", "graph", "network", "database", "SQLite", "SQL", "query", "fuzzy", "typo", "similar", "match", "closest", "MST", "spanning tree", "adjacency matrix", or "minimum", generate Python code
 - Use requests.get() or requests.post() as appropriate
 - Include email and secret parameters for authentication (as query params: ?email=...&secret=...)
 - For semantic search: try multiple approaches for query embedding (check docs response, GET with params, POST with json), fallback to text similarity if 404
@@ -236,6 +244,7 @@ Code generation rules:
 - For nested archives: recursively extract ZIPs, use member.endswith() not equality for file matching
 - For maze/treasure hunts: use BFS with queue, call move API for EVERY location (including start), check treasure after each move, explore paths
 - For network graphs: handle flexible edge field names (source/target OR from/to OR u/v), use edge.get() with fallbacks
+- For MST: fetch adjacency matrix, build networkx graph, use nx.minimum_spanning_tree(), sum edge weights - KEEP CODE CONCISE
 - For SQLite databases: download file, save to disk, connect with sqlite3, query with SELECT, use parameterized queries
 - For fuzzy matching: check if API response is dict, extract names array (data.get('names') or data.get('items')), use fuzzywuzzy or difflib for similarity
 - ALWAYS add error handling:
@@ -338,7 +347,7 @@ Do not include explanations unless specifically asked."""
                         model=self.model,
                         messages=messages,
                         temperature=0.1,  # Low temperature for more deterministic answers
-                        max_tokens=2000
+                        max_tokens=3000  # Increased to prevent truncation of complex algorithms
                     )
 
                 response = self._call_with_retry(make_api_call)
