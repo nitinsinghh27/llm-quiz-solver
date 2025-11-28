@@ -402,6 +402,11 @@ TASK: The puzzle asks you to submit the key. The key is: {key_str}"""
             if 'submit' in url.lower():
                 return url.rstrip('.,;:')
 
+        # Final fallback: use /submit relative to base_url
+        if base_url:
+            logger.warning("Could not find submit URL in question text, using /submit as fallback")
+            return urljoin(base_url, '/submit')
+
         logger.warning("Could not find submit URL in question text")
         return None
 
