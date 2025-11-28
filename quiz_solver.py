@@ -226,12 +226,45 @@ class QuizSolver:
         # Step 4.5: If question is still unclear (canvas/JS rendering), include HTML source as context
         if not context and ('<canvas' in html_content.lower() or 'ctx.fill' in html_content.lower()):
             logger.info("Detected canvas rendering - including JavaScript source as context")
-            # Extract JavaScript code that might contain the puzzle logic
-            script_match = re.search(r'<script[^>]*>(.*?)</script>', html_content, re.DOTALL | re.IGNORECASE)
-            if script_match:
-                js_code = script_match.group(1)
-                context = f"JavaScript Code that renders the puzzle:\n{js_code}\n\nEmail: {email}"
-                logger.info(f"Extracted {len(js_code)} chars of JavaScript code")
+            # Extract ALL script tags (might have multiple)
+            script_matches = re.findall(r'<script[^>]*>(.*?)</script>', html_content, re.DOTALL | re.IGNORECASE)
+            if script_matches:
+                # Combine all scripts
+                all_scripts = "\n\n".join(script_matches)
+
+                # Also compute emailNumber for reference
+                email_number = compute_email_number(email)
+                key = ((email_number * 7919 + 12345) % int(1e8))
+                key_str = str(key).zfill(8)  # Pad to 8 digits
+
+                # Extract canvas text lines if present
+                lines_match = re.search(r'const lines = \[(.*?)\];', all_scripts, re.DOTALL)
+                canvas_text = ""
+                if lines_match:
+                    lines_content = lines_match.group(1)
+                    # Parse the array of strings
+                    canvas_lines = re.findall(r'"([^"]*)"', lines_content)
+                    canvas_text = "\n".join(canvas_lines)
+
+                context = f"""Canvas-rendered puzzle.
+
+Puzzle Text (rendered on canvas):
+{canvas_text}
+
+JavaScript code:
+{all_scripts}
+
+Your email: {email}
+Computed emailNumber: {email_number}
+Computed key: {key_str}
+
+TASK: The puzzle asks you to submit the key. The key is: {key_str}"""
+                logger.info(f"Extracted {len(all_scripts)} chars of JavaScript")
+                logger.info(f"Pre-computed key for {email}: {key_str}")
+
+                # Also update question_text to include canvas text for submit URL extraction
+                if canvas_text:
+                    question_text += "\n\n" + canvas_text
 
         # Step 5: Use LLM to solve the question
         # Priority: If media files exist, use two-stage audio processing (transcript + code generation)
