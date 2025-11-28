@@ -105,6 +105,16 @@ class QuizSolver:
         # Step 2: Parse the HTML to extract the question
         soup = BeautifulSoup(html_content, 'html.parser')
 
+        # Extract cutoff value from HTML (if present in <span id="cutoff">)
+        cutoff_value = None
+        cutoff_span = soup.find('span', {'id': 'cutoff'})
+        if cutoff_span:
+            try:
+                cutoff_value = int(cutoff_span.get_text().strip())
+                logger.info(f"Extracted cutoff from HTML: {cutoff_value}")
+            except (ValueError, AttributeError) as e:
+                logger.warning(f"Could not parse cutoff value: {e}")
+
         # Extract text content from the result/question div or body
         # Try multiple common div IDs used in quiz pages
         result_div = soup.find('div', {'id': 'result'}) or soup.find('div', {'id': 'question'})
@@ -138,9 +148,41 @@ class QuizSolver:
             context = processed['text']
             media_files = processed['media_files']
 
-        # Step 5: Use LLM to solve the question
-        # For audio files, get the code/cutoff from audio and process CSV locally
-        if media_files:
+        # Step 5: Use LLM to solve the question OR process locally if cutoff is provided
+        # If cutoff value was found in HTML and we have CSV data, process locally
+        if cutoff_value is not None and context and 'CSV Data' in context:
+            logger.info(f"Processing CSV locally with cutoff value: {cutoff_value}")
+            try:
+                # Parse the CSV from context
+                import pandas as pd
+                from io import StringIO
+                # Extract CSV data from context
+                csv_match = re.search(r'CSV Data:\n(.+?)(?=\n\n|$)', context, re.DOTALL)
+                if csv_match:
+                    csv_text = csv_match.group(1)
+                    df = pd.read_csv(StringIO(csv_text), sep=r'\s+')  # Assuming space-separated
+                    # Count rows with value > cutoff (assuming single column)
+                    result = len(df[df.iloc[:, 0] > cutoff_value])
+                    formatted_answer = result
+                    logger.info(f"CSV processing result: {formatted_answer} rows with value > {cutoff_value}")
+                else:
+                    logger.error("Could not extract CSV data from context")
+                    formatted_answer = 0
+            except Exception as e:
+                logger.error(f"Error processing CSV with cutoff: {e}")
+                formatted_answer = 0
+
+            # Clean up media files if any were downloaded
+            for media_file in media_files:
+                try:
+                    if os.path.exists(media_file['path']):
+                        os.remove(media_file['path'])
+                        logger.info(f"Cleaned up media file: {media_file['path']}")
+                except Exception as e:
+                    logger.warning(f"Error cleaning up {media_file['path']}: {e}")
+
+        elif media_files:
+            # If we have media files but no cutoff in HTML, try to extract from audio
             logger.info("Processing audio file to extract code/cutoff value")
             # Get the code from audio
             audio_code = self.llm.solve_question(question_text, None, media_files)  # No CSV context
