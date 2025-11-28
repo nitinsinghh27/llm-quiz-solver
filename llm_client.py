@@ -260,7 +260,7 @@ Do not include explanations unless specifically asked."""
             logger.error(f"Error calling LLM API: {e}", exc_info=True)
             raise
 
-    def solve_with_audio_instructions(self, question_text, audio_transcript, csv_filename=None, cutoff_value=None):
+    def solve_with_audio_instructions(self, question_text, audio_transcript, csv_filename=None, cutoff_value=None, csv_url=None):
         """
         Use audio transcript to generate Python code that solves the problem
 
@@ -269,6 +269,7 @@ Do not include explanations unless specifically asked."""
             audio_transcript: The full transcript from audio file
             csv_filename: Name of the CSV file to process
             cutoff_value: The cutoff value (if applicable)
+            csv_url: URL to download CSV from if local file doesn't exist (optional)
 
         Returns:
             str: Python code to execute that will solve the problem
@@ -279,10 +280,11 @@ Do not include explanations unless specifically asked."""
             system_prompt = """You are a Python code generator for data analysis tasks. You will receive:
 1. Audio transcript with instructions on what to do with data
 2. Question text
-3. CSV filename (if applicable)
+3. CSV filename or URL (if applicable)
 4. Cutoff value (if applicable)
 
 Generate ONLY executable Python code that:
+- If a CSV URL is provided, download it first using requests: requests.get(url).content -> save to file
 - Reads the CSV file using pandas with header=None (CSV has NO header row)
 - Follows the instructions from the audio transcript
 - Stores the final answer in a variable called 'result'
@@ -296,13 +298,21 @@ Return ONLY the Python code, no explanations, no markdown formatting, no ```pyth
 Question:
 {question_text}"""
 
-            if csv_filename:
-                user_prompt += f"\n\nCSV File: {csv_filename}"
+            if csv_url:
+                # CSV failed to download locally - provide URL for LLM to download
+                user_prompt += f"\n\nCSV URL (download first): {csv_url}"
+                user_prompt += f"\nSave to local file: {csv_filename}"
+            elif csv_filename:
+                # CSV already downloaded locally
+                user_prompt += f"\n\nCSV File (already downloaded): {csv_filename}"
 
             if cutoff_value is not None:
                 user_prompt += f"\nCutoff Value: {cutoff_value}"
 
-            user_prompt += "\n\nGenerate Python code that solves this problem. The code should read the CSV file and store the final answer in a variable called 'result'."
+            if csv_url:
+                user_prompt += "\n\nGenerate Python code that:\n1. Downloads the CSV from the URL using requests\n2. Saves it to the specified filename\n3. Reads and processes it according to the instructions\n4. Stores the final answer in a variable called 'result'"
+            else:
+                user_prompt += "\n\nGenerate Python code that solves this problem. The code should read the CSV file and store the final answer in a variable called 'result'."
 
             # Use OpenAI-compatible API for text-only queries
             messages = [

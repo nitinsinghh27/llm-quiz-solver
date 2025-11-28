@@ -216,12 +216,14 @@ class QuizSolver:
         file_urls = self.extract_file_urls(html_content)
         context = None
         media_files = []
+        failed_downloads = {}
 
         if file_urls:
             logger.info(f"Found {len(file_urls)} file(s) to process")
             processed = self.process_files(file_urls, quiz_url)
             context = processed['text']
             media_files = processed['media_files']
+            failed_downloads = processed.get('failed_downloads', {})
 
         # Step 4.5: Check if page has JavaScript that needs to be extracted and executed
         script_matches = re.findall(r'<script[^>]*>(.*?)</script>', html_content, re.DOTALL | re.IGNORECASE)
@@ -373,12 +375,16 @@ Task: Convert this JavaScript to Python, execute the function(s), and return the
                 logger.info(f"FULL AUDIO TRANSCRIPT:\n{audio_transcript}")
                 logger.info("="*80)
 
-                # Extract CSV filename from media_files context
-                csv_filename = "temp_file.csv"  # We know we downloaded it as temp_file.csv
+                # Check if CSV file download failed
+                csv_filename = "temp_file.csv"
+                csv_url = None
+                if 'temp_file.csv' in failed_downloads:
+                    csv_url = failed_downloads['temp_file.csv']
+                    logger.warning(f"CSV file failed to download locally, will provide URL to LLM: {csv_url}")
 
                 # Generate Python code from LLM
                 generated_code = self.llm.solve_with_audio_instructions(
-                    question_text, audio_transcript, csv_filename, cutoff_value
+                    question_text, audio_transcript, csv_filename, cutoff_value, csv_url
                 )
 
                 if generated_code:
@@ -646,11 +652,13 @@ Available credentials:
             base_url: Base URL for resolving relative URLs
 
         Returns:
-            dict: Contains 'text' (str) for text context and 'files' (list) for audio/video file paths
+            dict: Contains 'text' (str) for text context, 'media_files' (list) for audio/video,
+                  and 'failed_downloads' (dict) mapping filename to working URL
         """
         context_parts = []
         media_files = []  # Store paths to audio/video files for multimodal LLM
-        from urllib.parse import urljoin
+        failed_downloads = {}  # Track failed downloads with working URLs
+        from urllib.parse import urljoin, urlparse
 
         with BrowserHandler() as browser:
             for url in file_urls:
@@ -703,8 +711,60 @@ Available credentials:
                     ext = url.split('.')[-1].split('?')[0].lower()  # Remove query params
                     filename = f"temp_file.{ext}"
 
-                    # Download file
-                    browser.download_file(url, filename)
+                    # Try to download file - with fallback to alternate URLs
+                    download_success = False
+                    working_url = None
+
+                    # Try the original URL first
+                    try:
+                        browser.download_file(url, filename)
+                        download_success = True
+                        working_url = url
+                        logger.info(f"Successfully downloaded from: {url}")
+                    except Exception as download_error:
+                        logger.warning(f"Failed to download from {url}: {download_error}")
+
+                        # Try alternate URL patterns (e.g., root path instead of relative)
+                        if base_url:
+                            # Extract just the filename from the URL
+                            url_path = urlparse(url).path
+                            just_filename = url_path.split('/')[-1]
+
+                            # Try root path: https://domain.com/filename.ext
+                            parsed_base = urlparse(base_url)
+                            alternate_url = f"{parsed_base.scheme}://{parsed_base.netloc}/{just_filename}"
+
+                            logger.info(f"Trying alternate URL: {alternate_url}")
+                            try:
+                                browser.download_file(alternate_url, filename)
+                                download_success = True
+                                working_url = alternate_url
+                                logger.info(f"Successfully downloaded from alternate URL: {alternate_url}")
+                            except Exception as alt_error:
+                                logger.warning(f"Failed to download from alternate URL {alternate_url}: {alt_error}")
+
+                    if not download_success:
+                        # Download failed - track this so LLM can download it in generated code
+                        logger.error(f"All download attempts failed for {url}")
+
+                        # Store the URL that we tried (for LLM to download in generated code)
+                        # If we tried alternate URL, store that; otherwise store original
+                        if base_url:
+                            # We tried an alternate URL, so store that one
+                            url_path = urlparse(url).path
+                            just_filename = url_path.split('/')[-1]
+                            parsed_base = urlparse(base_url)
+                            url_to_store = f"{parsed_base.scheme}://{parsed_base.netloc}/{just_filename}"
+                        else:
+                            url_to_store = url
+
+                        failed_downloads[filename] = url_to_store
+
+                        # Add context note about failed download so LLM knows to download it
+                        if ext == 'csv':
+                            context_parts.append(f"CSV file needs to be downloaded from: {url_to_store}\nFilename: {filename}")
+
+                        continue  # Skip processing this file
 
                     # Process based on file type
                     if ext == 'csv':
@@ -767,7 +827,8 @@ Available credentials:
 
         return {
             'text': "\n\n".join(context_parts) if context_parts else None,
-            'media_files': media_files
+            'media_files': media_files,
+            'failed_downloads': failed_downloads
         }
 
     def submit_answer(self, submit_url, email, secret, quiz_url, answer):
