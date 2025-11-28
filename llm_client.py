@@ -42,14 +42,21 @@ class LLMClient:
                 system_prompt = """Transcribe this audio file completely and accurately. Provide the full transcript of everything spoken."""
                 user_prompt = "Please provide a complete transcript of the audio."
             else:
-                system_prompt = """You are a data analysis expert helping to solve quiz questions.
-The questions involve data sourcing, preparation, analysis, and visualization.
+                system_prompt = """You are a data analysis and puzzle-solving expert helping to solve quiz questions.
+The questions involve data sourcing, preparation, analysis, visualization, and logic puzzles (like alphametic/cryptarithmetic).
+
+For alphametic puzzles (where letters represent digits):
+- Read the JavaScript code to understand the puzzle
+- Extract the equation (e.g., FORK + LIME = result)
+- Find the emailNumber calculation
+- Calculate the key using: ((emailNumber * 7919 + 12345) mod 1e8)
+- Convert the key to digits and map them to the required letter sequence
 
 Instructions:
-1. Read the question carefully
+1. Read the question and context carefully (including any JavaScript code)
 2. If data or files are mentioned, they will be provided in the context
 3. If audio/video files are provided, listen/watch them carefully to extract information
-4. Perform the required analysis
+4. Perform the required analysis or solve the puzzle
 5. Return ONLY the final answer in the format requested
 6. For numerical answers, return just the number
 7. For text answers, return just the text

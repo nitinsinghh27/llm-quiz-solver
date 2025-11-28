@@ -223,6 +223,16 @@ class QuizSolver:
             context = processed['text']
             media_files = processed['media_files']
 
+        # Step 4.5: If question is still unclear (canvas/JS rendering), include HTML source as context
+        if not context and ('<canvas' in html_content.lower() or 'ctx.fill' in html_content.lower()):
+            logger.info("Detected canvas rendering - including JavaScript source as context")
+            # Extract JavaScript code that might contain the puzzle logic
+            script_match = re.search(r'<script[^>]*>(.*?)</script>', html_content, re.DOTALL | re.IGNORECASE)
+            if script_match:
+                js_code = script_match.group(1)
+                context = f"JavaScript Code that renders the puzzle:\n{js_code}\n\nEmail: {email}"
+                logger.info(f"Extracted {len(js_code)} chars of JavaScript code")
+
         # Step 5: Use LLM to solve the question
         # Priority: If media files exist, use two-stage audio processing (transcript + code generation)
         if media_files:
