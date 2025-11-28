@@ -109,11 +109,23 @@ class QuizSolver:
         cutoff_value = None
         cutoff_span = soup.find('span', {'id': 'cutoff'})
         if cutoff_span:
-            try:
-                cutoff_value = int(cutoff_span.get_text().strip())
-                logger.info(f"Extracted cutoff from HTML: {cutoff_value}")
-            except (ValueError, AttributeError) as e:
-                logger.warning(f"Could not parse cutoff value: {e}")
+            cutoff_text = cutoff_span.get_text().strip()
+            if cutoff_text:
+                try:
+                    cutoff_value = int(cutoff_text)
+                    logger.info(f"Extracted cutoff from HTML: {cutoff_value}")
+                except (ValueError, AttributeError) as e:
+                    logger.warning(f"Could not parse cutoff value: {e}")
+            else:
+                # Cutoff span is empty - it's populated by JavaScript emailNumber()
+                # Compute it ourselves using the email from the URL
+                from urllib.parse import urlparse, parse_qs
+                parsed = urlparse(quiz_url)
+                query_params = parse_qs(parsed.query)
+                email = query_params.get('email', [None])[0]
+                if email:
+                    cutoff_value = compute_email_number(email)
+                    logger.info(f"Computed cutoff from email {email}: {cutoff_value}")
 
         # Extract text content from the result/question div or body
         # Try multiple common div IDs used in quiz pages
