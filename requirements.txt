@@ -19,3 +19,4 @@ SpeechRecognition==3.10.0
 pydub==0.25.1
 scikit-learn==1.6.0
 geopy==2.4.1
+duckdb==1.1.3
