@@ -124,6 +124,12 @@ CRITICAL SECURITY RULE:
 - The secret is for API authentication, NOT for solving puzzles
 - If a question asks for a "secret code" or similar, it refers to content in images, audio, files, or computed values - NEVER the authentication secret
 
+CRITICAL DEBUGGING RULE - MUST FOLLOW:
+- For EVERY API call, IMMEDIATELY after response = requests.get/post(), you MUST add: print("API Response:", response.json())
+- For EVERY pandas DataFrame, IMMEDIATELY after df = pd.read_csv(), you MUST add: print("Columns:", df.columns.tolist()) and print("Sample:", df.head())
+- DO NOT comment out these print statements - they MUST be active
+- These prints are MANDATORY for debugging and understanding data structure
+
 For API-related questions:
 - If the question asks you to call an API, generate Python code using requests library
 - Include proper authentication (email, secret as query parameters or headers)
@@ -266,9 +272,11 @@ For spatial/geometric analysis questions (distance, coordinates):
 For CSV processing/analysis questions:
 - Download CSV from API endpoint using requests with email and secret
 - Use pandas.read_csv() for robust parsing (handles headers, types, etc.)
-- IMPORTANT: Print df.head() and df.columns to verify structure
+- CRITICAL: MUST print df.head() and df.columns (DO NOT comment these out)
+- Example: print("Columns:", df.columns.tolist()) and print("First rows:", df.head())
 - Check actual column names - they may differ from expected (case, spacing, etc.)
-- Filter data based on conditions (e.g., region=='North', currency=='USD')
+- Use exact column names from df.columns (case-sensitive)
+- Filter data based on conditions (e.g., df['region']=='North' if column is 'region')
 - Use pandas operations: df[df['column'] == value]
 - Calculate aggregations: sum(), mean(), count(), etc.
 - Handle missing/null values with dropna() or fillna()
@@ -277,12 +285,29 @@ For CSV processing/analysis questions:
 For API calls with custom headers/authentication:
 - Send custom headers using requests.get(url, headers={'X-API-Key': 'value'})
 - Still include email and secret as query parameters: params={'email': email, 'secret': secret}
-- Check if response is list or dict with 'data'/'items' key
-- If dict, extract array: response.get('data') or response.get('items')
-- IMPORTANT: Print response structure and first item to identify field names
-- Look for flexible field names: 'city'/'name', 'temperature'/'temp'/'value'
+- CRITICAL: ALWAYS print the full response first: print("Response:", response.json())
+- Check response type: isinstance(response.json(), dict) or isinstance(response.json(), list)
+- If response is a list directly, iterate through it
+- If response is dict, check for 'data'/'items'/'cities'/'weather' keys and extract array
+- Print first item structure: print("First item:", data[0])
+- Look for flexible field names: 'city'/'name'/'location', 'temperature'/'temp'/'value'/'degrees'
 - Find max/min values using loops or max() function with key parameter
-- Debug: print full response to understand structure
+- ALWAYS print intermediate results for debugging
+
+For data cleaning questions (dirty/messy data):
+- Fetch data from API with email and secret parameters
+- CRITICAL: Print the full response first: print("Response:", response.json())
+- Check if response is list or dict (extract 'data'/'items' if dict)
+- Print first few items to see the structure: print("Sample items:", data[:3])
+- For price/numeric cleaning:
+  * Print each raw value before cleaning: print(f"Raw value: {raw_value}")
+  * Remove currency symbols ($, €, £), commas, spaces
+  * Handle null/None values (skip them)
+  * Handle non-numeric strings like "Free", "N/A", "TBD" (skip them)
+  * Use regex or string methods to extract numeric values
+  * Convert to float and add to sum
+  * Print running total: print(f"After adding {cleaned}: total = {total}")
+- Return the final sum (check if answer needs rounding)
 
 Instructions:
 1. Read the question and context carefully (including any JavaScript code)
@@ -296,9 +321,11 @@ Instructions:
 9. Otherwise, return ONLY the final answer in the format requested
 
 Code generation rules:
-- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", "ZIP", "maze", "treasure", "explore", "navigate", "graph", "network", "database", "SQLite", "SQL", "query", "fuzzy", "typo", "similar", "match", "closest", "MST", "spanning tree", "adjacency matrix", "minimum", "join", "filter", "pipeline", "aggregate", "calculate", "distance", "Euclidean", "spatial", "coordinates", "geometric", "CSV", "analysis", "sum", "revenue", "total", "header", "authentication", "custom header", "X-API-Key", "highest", "maximum", "lowest", "minimum", "weather", "DOM", "HTML", "parse", "scraping", "web scraping", "extract", "find", "class", "id", "tag", "reversed", "reverse", or "hidden", generate Python code
+- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", "ZIP", "maze", "treasure", "explore", "navigate", "graph", "network", "database", "SQLite", "SQL", "query", "fuzzy", "typo", "similar", "match", "closest", "MST", "spanning tree", "adjacency matrix", "minimum", "join", "filter", "pipeline", "aggregate", "calculate", "distance", "Euclidean", "spatial", "coordinates", "geometric", "CSV", "analysis", "sum", "revenue", "total", "header", "authentication", "custom header", "X-API-Key", "highest", "maximum", "lowest", "minimum", "weather", "DOM", "HTML", "parse", "scraping", "web scraping", "extract", "find", "class", "id", "tag", "reversed", "reverse", "hidden", "clean", "cleaning", "dirty", "messy", "price", "numeric", or "valid", generate Python code
 - Use requests.get() or requests.post() as appropriate
 - Include email and secret parameters for authentication (as query params: ?email=...&secret=...)
+- MANDATORY: After EVERY response = requests.get/post(), IMMEDIATELY add: print("API Response:", response.json())
+- MANDATORY: After EVERY df = pd.read_csv(), IMMEDIATELY add: print("Columns:", df.columns.tolist()) and print("Sample:", df.head())
 - For semantic search: try multiple approaches for query embedding (check docs response, GET with params, POST with json), fallback to text similarity if 404
 - For merge conflict detection: compare base vs theirs, base vs ours, and find keys with different modifications
 - For steganography: download image, extract LSB from RGB pixels in order, accumulate bits into bytes with << 1, extract 100-200 chars minimum, filter non-printable at end
@@ -310,9 +337,10 @@ Code generation rules:
 - For fuzzy matching: check if API response is dict, extract names array (data.get('names') or data.get('items')), use fuzzywuzzy or difflib for similarity
 - For data pipelines/joins: fetch from multiple endpoints, check if response is dict (extract 'data'/'items' key), print data structure for debugging, use dict lookups for joins
 - For spatial/distance: check if response is dict (extract 'locations'/'data'/'points'), print structure, look for flexible field names (id/name for identifier, point/coordinates for [x,y])
-- For CSV analysis: use pandas.read_csv(), print df.head() and df.columns for debugging, filter with df[df['col']==value], aggregate with sum()/mean()
-- For custom headers: pass headers={'X-API-Key': 'value'} to requests.get(), still use query params for auth, check if response is dict (extract 'data'/'items'), print structure, use flexible field names for max/min operations
+- For CSV analysis: use pandas.read_csv(), MUST print(df.columns.tolist()) and print(df.head()) - DO NOT comment out print statements, use exact column names from output (case-sensitive), filter with df[df['col']==value], aggregate with sum()/mean()
+- For custom headers: pass headers={'X-API-Key': 'value'} to requests.get(), still use query params for auth, ALWAYS print full response.json() first, check if response is list or dict, extract array from dict keys ('data'/'items'/'cities'/'weather'), print first item, use flexible field names for max/min operations
 - For DOM/HTML parsing: use BeautifulSoup to parse HTML context, find elements by class/id (soup.find('div', class_='name')), extract text with .get_text().strip(), handle transformations (reverse with [::-1], decode base64, etc.), print raw text before transformations
+- For data cleaning: print full response.json() first, check if list or dict (extract 'data'/'items'), print sample items, for each item print raw value before cleaning, remove symbols/commas, handle nulls/non-numeric strings, print running total
 - ALWAYS add error handling:
   * Check response.status_code before parsing
   * Verify response is dict/list before accessing keys: isinstance(data, dict)
@@ -321,6 +349,7 @@ Code generation rules:
   * NEVER use exit() or sys.exit() - just set result variable and continue
 - If an API fails, try alternate approaches or check response.text for debugging
 - Store final answer in 'result' variable (even if it's an error message)
+- CRITICAL: All print() statements for debugging MUST be active (not commented out)
 - Return ONLY Python code, no markdown blocks
 
 Answer format:
