@@ -530,14 +530,28 @@ Available credentials:
 
                         logger.info(f"Executing generated code:\n{code}")
 
-                        # Execute the code with available context
-                        namespace = {
-                            '__builtins__': __builtins__,
-                            'email': email,
-                            'secret': secret,
-                            'quiz_url': quiz_url
-                        }
-                        exec(code, namespace)
+                        # Capture stdout during code execution to log debug prints
+                        import sys
+                        import io
+                        captured_output = io.StringIO()
+                        original_stdout = sys.stdout
+                        sys.stdout = captured_output
+
+                        try:
+                            # Execute the code with available context
+                            namespace = {
+                                '__builtins__': __builtins__,
+                                'email': email,
+                                'secret': secret,
+                                'quiz_url': quiz_url
+                            }
+                            exec(code, namespace)
+                        finally:
+                            # Restore stdout
+                            sys.stdout = original_stdout
+                            output = captured_output.getvalue()
+                            if output.strip():
+                                logger.info(f"Code execution output:\n{output}")
 
                         if 'result' in namespace:
                             formatted_answer = namespace['result']
