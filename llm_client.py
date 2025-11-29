@@ -253,6 +253,17 @@ For spatial/geometric analysis questions (distance, coordinates):
 - Round results to specified decimal places
 - Handle missing coordinates gracefully with error messages
 
+For CSV processing/analysis questions:
+- Download CSV from API endpoint using requests with email and secret
+- Use pandas.read_csv() for robust parsing (handles headers, types, etc.)
+- IMPORTANT: Print df.head() and df.columns to verify structure
+- Check actual column names - they may differ from expected (case, spacing, etc.)
+- Filter data based on conditions (e.g., region=='North', currency=='USD')
+- Use pandas operations: df[df['column'] == value]
+- Calculate aggregations: sum(), mean(), count(), etc.
+- Handle missing/null values with dropna() or fillna()
+- Debug: print filtered data to verify logic is correct
+
 Instructions:
 1. Read the question and context carefully (including any JavaScript code)
 2. If the question requires calling an API or performing computation, generate Python code
@@ -265,7 +276,7 @@ Instructions:
 9. Otherwise, return ONLY the final answer in the format requested
 
 Code generation rules:
-- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", "ZIP", "maze", "treasure", "explore", "navigate", "graph", "network", "database", "SQLite", "SQL", "query", "fuzzy", "typo", "similar", "match", "closest", "MST", "spanning tree", "adjacency matrix", "minimum", "join", "filter", "pipeline", "aggregate", "calculate", "distance", "Euclidean", "spatial", "coordinates", or "geometric", generate Python code
+- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", "ZIP", "maze", "treasure", "explore", "navigate", "graph", "network", "database", "SQLite", "SQL", "query", "fuzzy", "typo", "similar", "match", "closest", "MST", "spanning tree", "adjacency matrix", "minimum", "join", "filter", "pipeline", "aggregate", "calculate", "distance", "Euclidean", "spatial", "coordinates", "geometric", "CSV", "analysis", "sum", "revenue", or "total", generate Python code
 - Use requests.get() or requests.post() as appropriate
 - Include email and secret parameters for authentication (as query params: ?email=...&secret=...)
 - For semantic search: try multiple approaches for query embedding (check docs response, GET with params, POST with json), fallback to text similarity if 404
@@ -279,6 +290,7 @@ Code generation rules:
 - For fuzzy matching: check if API response is dict, extract names array (data.get('names') or data.get('items')), use fuzzywuzzy or difflib for similarity
 - For data pipelines/joins: fetch from multiple endpoints, check if response is dict (extract 'data'/'items' key), print data structure for debugging, use dict lookups for joins
 - For spatial/distance: check if response is dict (extract 'locations'/'data'/'points'), print structure, look for flexible field names (id/name for identifier, point/coordinates for [x,y])
+- For CSV analysis: use pandas.read_csv(), print df.head() and df.columns for debugging, filter with df[df['col']==value], aggregate with sum()/mean()
 - ALWAYS add error handling:
   * Check response.status_code before parsing
   * Verify response is dict/list before accessing keys: isinstance(data, dict)
