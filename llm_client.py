@@ -135,6 +135,16 @@ For image analysis questions:
 - Extract text, codes, or patterns from the images
 - Return ONLY what you see in the image, not authentication credentials
 
+For DOM parsing/HTML extraction questions:
+- Parse HTML content to find specific elements by class, id, or tag
+- Use BeautifulSoup: from bs4 import BeautifulSoup; soup = BeautifulSoup(html, 'html.parser')
+- Find elements: soup.find('div', class_='classname') or soup.find(id='idname')
+- Extract text: element.get_text() or element.text
+- Handle text transformations: reversed text use [::-1], base64 decode, etc.
+- IMPORTANT: Print the raw extracted text before any transformations for debugging
+- Remove extra whitespace with .strip() after extraction
+- Return the final processed value
+
 For alphametic puzzles:
 - Read the JavaScript code to understand the puzzle
 - Extract the equation (e.g., FORK + LIME = result)
@@ -264,6 +274,16 @@ For CSV processing/analysis questions:
 - Handle missing/null values with dropna() or fillna()
 - Debug: print filtered data to verify logic is correct
 
+For API calls with custom headers/authentication:
+- Send custom headers using requests.get(url, headers={'X-API-Key': 'value'})
+- Still include email and secret as query parameters: params={'email': email, 'secret': secret}
+- Check if response is list or dict with 'data'/'items' key
+- If dict, extract array: response.get('data') or response.get('items')
+- IMPORTANT: Print response structure and first item to identify field names
+- Look for flexible field names: 'city'/'name', 'temperature'/'temp'/'value'
+- Find max/min values using loops or max() function with key parameter
+- Debug: print full response to understand structure
+
 Instructions:
 1. Read the question and context carefully (including any JavaScript code)
 2. If the question requires calling an API or performing computation, generate Python code
@@ -276,7 +296,7 @@ Instructions:
 9. Otherwise, return ONLY the final answer in the format requested
 
 Code generation rules:
-- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", "ZIP", "maze", "treasure", "explore", "navigate", "graph", "network", "database", "SQLite", "SQL", "query", "fuzzy", "typo", "similar", "match", "closest", "MST", "spanning tree", "adjacency matrix", "minimum", "join", "filter", "pipeline", "aggregate", "calculate", "distance", "Euclidean", "spatial", "coordinates", "geometric", "CSV", "analysis", "sum", "revenue", or "total", generate Python code
+- If question mentions "call the API", "API endpoint", "fetch", "embedding", "merge conflict", "steganography", "LSB", "download", "archive", "nested", "ZIP", "maze", "treasure", "explore", "navigate", "graph", "network", "database", "SQLite", "SQL", "query", "fuzzy", "typo", "similar", "match", "closest", "MST", "spanning tree", "adjacency matrix", "minimum", "join", "filter", "pipeline", "aggregate", "calculate", "distance", "Euclidean", "spatial", "coordinates", "geometric", "CSV", "analysis", "sum", "revenue", "total", "header", "authentication", "custom header", "X-API-Key", "highest", "maximum", "lowest", "minimum", "weather", "DOM", "HTML", "parse", "scraping", "web scraping", "extract", "find", "class", "id", "tag", "reversed", "reverse", or "hidden", generate Python code
 - Use requests.get() or requests.post() as appropriate
 - Include email and secret parameters for authentication (as query params: ?email=...&secret=...)
 - For semantic search: try multiple approaches for query embedding (check docs response, GET with params, POST with json), fallback to text similarity if 404
@@ -291,6 +311,8 @@ Code generation rules:
 - For data pipelines/joins: fetch from multiple endpoints, check if response is dict (extract 'data'/'items' key), print data structure for debugging, use dict lookups for joins
 - For spatial/distance: check if response is dict (extract 'locations'/'data'/'points'), print structure, look for flexible field names (id/name for identifier, point/coordinates for [x,y])
 - For CSV analysis: use pandas.read_csv(), print df.head() and df.columns for debugging, filter with df[df['col']==value], aggregate with sum()/mean()
+- For custom headers: pass headers={'X-API-Key': 'value'} to requests.get(), still use query params for auth, check if response is dict (extract 'data'/'items'), print structure, use flexible field names for max/min operations
+- For DOM/HTML parsing: use BeautifulSoup to parse HTML context, find elements by class/id (soup.find('div', class_='name')), extract text with .get_text().strip(), handle transformations (reverse with [::-1], decode base64, etc.), print raw text before transformations
 - ALWAYS add error handling:
   * Check response.status_code before parsing
   * Verify response is dict/list before accessing keys: isinstance(data, dict)
