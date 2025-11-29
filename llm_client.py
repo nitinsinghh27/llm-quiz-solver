@@ -251,10 +251,16 @@ For data pipeline/join/filtering questions:
 - Fetch data from multiple API endpoints (users, products, orders, etc.)
 - Check if API response is list or dict with 'data'/'items' key
 - If dict, extract array: response.get('data') or response.get('items') or response.get('users')
-- Print/debug the structure of fetched data to verify field names
+- CRITICAL: Print the structure of fetched data to verify EXACT field names
+- AFTER printing, examine the actual field names in the response
+- Common field name variations to look for:
+  * Product list in orders: 'items' OR 'product_ids' OR 'products' (check printed output!)
+  * Order ID: 'id' OR 'order_id' (check printed output!)
+  * User ID: 'id' OR 'user_id' (check printed output!)
+- Use the EXACT field names from the printed response (e.g., if you see 'items' use order['items'] NOT order['product_ids'])
 - Build lookup dictionaries for efficient joins (e.g., product_id -> price)
 - Filter based on conditions (e.g., tier == 'gold')
-- Join data by matching IDs (user_id, product_id, order_id, etc.)
+- Join data by matching IDs using exact field names from printed output
 - Handle missing/null values gracefully with .get() method
 - Calculate aggregations (sum, count, average) as required
 - Debug: print intermediate results (filtered users, matching orders, etc.)
@@ -273,10 +279,12 @@ For CSV processing/analysis questions:
 - Download CSV from API endpoint using requests with email and secret
 - Use pandas.read_csv() for robust parsing (handles headers, types, etc.)
 - CRITICAL: MUST print df.head() and df.columns (DO NOT comment these out)
-- Example: print("Columns:", df.columns.tolist()) and print("First rows:", df.head())
-- Check actual column names - they may differ from expected (case, spacing, etc.)
-- Use exact column names from df.columns (case-sensitive)
-- Filter data based on conditions (e.g., df['region']=='North' if column is 'region')
+- Example: print("Columns:", df.columns.tolist()) and print("Sample:", df.head())
+- CRITICAL: Column names are CASE-SENSITIVE and may be lowercase (e.g., 'region' not 'Region', 'amount' not 'Amount', 'currency' not 'Currency')
+- AFTER printing columns, look at the EXACT column names and use them as-is
+- DO NOT assume capitalized column names - check the printed output
+- For example: if columns are ['region', 'amount', 'currency'], use df['region'] NOT df['Region']
+- Filter data based on conditions using EXACT column names: df[df['region']=='North'] if column is 'region'
 - Use pandas operations: df[df['column'] == value]
 - Calculate aggregations: sum(), mean(), count(), etc.
 - Handle missing/null values with dropna() or fillna()
@@ -285,11 +293,12 @@ For CSV processing/analysis questions:
 For API calls with custom headers/authentication:
 - Send custom headers using requests.get(url, headers={'X-API-Key': 'value'})
 - Still include email and secret as query parameters: params={'email': email, 'secret': secret}
-- CRITICAL: ALWAYS print the full response first: print("Response:", response.json())
-- Check response type: isinstance(response.json(), dict) or isinstance(response.json(), list)
-- If response is a list directly, iterate through it
-- If response is dict, check for 'data'/'items'/'cities'/'weather' keys and extract array
-- Print first item structure: print("First item:", data[0])
+- CRITICAL: ALWAYS print the full response first: print("API Response:", response.json())
+- CRITICAL: Check response type FIRST before accessing data:
+  * If isinstance(data, list): cities_data = data  # Response is list directly
+  * elif isinstance(data, dict): cities_data = data.get('cities') or data.get('data') or data.get('items') or data.get('weather')
+  * MUST handle both cases with if/elif, not just one case
+- Print first item structure: print("First item:", cities_data[0] if cities_data else "No data")
 - Look for flexible field names: 'city'/'name'/'location', 'temperature'/'temp'/'value'/'degrees'
 - Find max/min values using loops or max() function with key parameter
 - ALWAYS print intermediate results for debugging
@@ -335,10 +344,10 @@ Code generation rules:
 - For MST: fetch adjacency matrix, build networkx graph, use nx.minimum_spanning_tree(), sum edge weights - KEEP CODE CONCISE
 - For SQLite databases: download file, save to disk, connect with sqlite3, query with SELECT, use parameterized queries
 - For fuzzy matching: check if API response is dict, extract names array (data.get('names') or data.get('items')), use fuzzywuzzy or difflib for similarity
-- For data pipelines/joins: fetch from multiple endpoints, check if response is dict (extract 'data'/'items' key), print data structure for debugging, use dict lookups for joins
+- For data pipelines/joins: fetch from multiple endpoints, check if response is dict (extract 'data'/'items' key), CRITICAL: print ALL response structures first and examine EXACT field names, common variations: 'items'/'product_ids'/'products' for order items, 'id'/'order_id' for order ID (use EXACT names from printed output like order['items'] NOT order['product_ids']), use dict lookups for joins
 - For spatial/distance: check if response is dict (extract 'locations'/'data'/'points'), print structure, look for flexible field names (id/name for identifier, point/coordinates for [x,y])
-- For CSV analysis: use pandas.read_csv(), MUST print(df.columns.tolist()) and print(df.head()) - DO NOT comment out print statements, use exact column names from output (case-sensitive), filter with df[df['col']==value], aggregate with sum()/mean()
-- For custom headers: pass headers={'X-API-Key': 'value'} to requests.get(), still use query params for auth, ALWAYS print full response.json() first, check if response is list or dict, extract array from dict keys ('data'/'items'/'cities'/'weather'), print first item, use flexible field names for max/min operations
+- For CSV analysis: use pandas.read_csv(), MUST print(df.columns.tolist()) and print(df.head()) - DO NOT comment out print statements, CRITICAL: column names are CASE-SENSITIVE and often lowercase (e.g., 'region' not 'Region', 'amount' not 'Amount'), LOOK AT the printed columns and use EXACT names (if you see ['region', 'amount', 'currency'] use df['region'] NOT df['Region']), filter with df[df['col']==value], aggregate with sum()/mean()
+- For custom headers: pass headers={'X-API-Key': 'value'} to requests.get(), still use query params for auth, ALWAYS print full response.json() first, CRITICAL: check if response is list FIRST (if isinstance(data, list): use directly) then check dict (elif isinstance(data, dict): extract 'data'/'items'/'cities'/'weather'), MUST handle both cases with if/elif, print first item, use flexible field names for max/min operations
 - For DOM/HTML parsing: use BeautifulSoup to parse HTML context, find elements by class/id (soup.find('div', class_='name')), extract text with .get_text().strip(), handle transformations (reverse with [::-1], decode base64, etc.), print raw text before transformations
 - For data cleaning: print full response.json() first, check if list or dict (extract 'data'/'items'), print sample items, for each item print raw value before cleaning, remove symbols/commas, handle nulls/non-numeric strings, print running total
 - ALWAYS add error handling:
